@@ -42,6 +42,6 @@ In Supabase Auth, change Site URL to the Netlify URL and allow its `/merchant` r
 
 Verify API readiness, merchant login and email confirmation, ownership isolation, product/image persistence, a draft that stays private, publishing, a new-tab storefront, delivery and pickup quotes, successful/failed demo checkout, receipt reload, and merchant fulfillment. Confirm the GitHub checks passed. Cold starts on free services can make the first request slow; the app supplies loading/retry states.
 
-There is no local Docker installation in this workspace, so the Docker build is not locally verified. The GitHub workflow includes that build, and live configuration still needs provider account access. Hosting accounts, provider limits, and auth redirect configuration cannot be inferred from source files.
+There is no local Docker installation in this workspace. The Docker image build passed in GitHub Actions, alongside API and frontend checks. Live configuration still needs provider account access. Hosting accounts, provider limits, and auth redirect configuration cannot be inferred from source files.
 
 References: [Render Blueprint configuration](https://render.com/docs/blueprint-spec), [Render free services](https://render.com/docs/free), and [Next.js on Netlify](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/).
