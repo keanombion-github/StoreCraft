@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- Standard images for remote fictional product photos. */
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   initialProducts,
   initialSettings,
@@ -219,6 +220,7 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
           <button className="quiet" onClick={() => openStore()}>
             View store ↗
           </button>
+          <Link className="quiet" href="/merchant">Merchant sign in</Link>
         </header>
         <main
           className={view === "Home" ? "content home-dashboard" : "content"}

@@ -4,7 +4,7 @@ A learning project for a merchant dashboard and customer storefront. StoreCraft 
 
 ## Current status
 
-A working first interface is in `apps/web`: a responsive merchant dashboard and sample customer storefront with fictional data. The .NET API and store/product migration are scaffolded in `apps/api`; they are not connected to Supabase or the dashboard yet. Authentication, live database storage, the section builder, publishing, and checkout remain to build.
+A persistent workspace at `/merchant` now connects Supabase Auth, the .NET API, and PostgreSQL. It includes products/settings, a prebuilt-widget builder with drafts and publishing, a public storefront in a new tab, local test checkout, receipts, and fulfillment tracking. The original `/` remains a browser sandbox. See [the commerce guide](docs/merchant-commerce-guide.md) for setup, changed files, verification, and remaining work.
 
 See [docs/milestone-2-foundation.md](docs/milestone-2-foundation.md) for the API walkthrough and Supabase setup step. View store now opens the sample storefront in a new tab at `/s/sunday-supply`.
 
@@ -60,7 +60,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Browser checks cover product persistence and draft visibility, cart quantities, settings persistence, navigation, failed-payment fulfillment restrictions, and desktop/phone layout. They do not verify backend commerce rules, since there is no API yet.
+Browser checks cover sandbox persistence, navigation, login screens, checkout UI, and desktop/phone layout. Backend checks run with `dotnet test tests/StoreCraft.Api.Tests` from the repository root and use isolated temporary database records.
 
 ## Installed versions
 

@@ -8,7 +8,11 @@ public sealed class CommerceDesignTimeFactory : IDesignTimeDbContextFactory<Comm
     public CommerceDbContext CreateDbContext(string[] args)
     {
         // Generating migrations does not connect. Applying them requires a real secret.
-        var connection = Environment.GetEnvironmentVariable("ConnectionStrings__Commerce")
+        var configuration = new ConfigurationBuilder()
+            .AddUserSecrets<CommerceDesignTimeFactory>(optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+        var connection = configuration.GetConnectionString("Commerce")
             ?? "Host=localhost;Database=storecraft_design_only;Username=placeholder;Password=placeholder";
         return new CommerceDbContext(new DbContextOptionsBuilder<CommerceDbContext>().UseNpgsql(connection).Options);
     }

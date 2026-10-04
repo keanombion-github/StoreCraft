@@ -10,4 +10,8 @@ public sealed class Store
     public required string ContactEmail { get; set; }
     public string Currency { get; set; } = "SGD";
     public DateTimeOffset CreatedAt { get; set; }
+    public long ShippingMinorUnits { get; set; } = 500;
+    public long FreeShippingThreshold { get; set; } = 10000;
+    public string? DraftDocument { get; set; }
+    public Guid? PublishedVersionId { get; set; }
 }
