@@ -20,6 +20,7 @@ using StoreCraft.Api.Features.Storefront;
 public class CommerceJourney
 {
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task OwnershipPublishingCheckoutAndConcurrentStockAreEnforced()
     {
         using var factory = new TestApplication();
@@ -42,7 +43,9 @@ public class CommerceJourney
             client.DefaultRequestHeaders.Authorization = new("Bearer", factory.Token(owner));
             Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/public/stores/{slug}")).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish", PageRules.Default)).StatusCode);
-            var draft = PageRules.Default with {Sections=[new("notice","Announcement","Unpublished change","","","")]};
+            var invalidFeatured = PageRules.Default with { Sections = PageRules.Default.Sections.Select(s => s.Type == "FeaturedProducts" ? s with { ProductIds = [Guid.NewGuid()] } : s).ToArray() };
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/merchant/page/publish", invalidFeatured)).StatusCode);
+            var draft = PageRules.Default with { Sections = PageRules.Default.Sections.Select(s => s.Id == "hero" ? s with { Title = "Unpublished change" } : s).ToArray() };
             Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/merchant/page", draft)).StatusCode);
             var published = await client.GetStringAsync($"/api/public/stores/{slug}");
             Assert.DoesNotContain("Unpublished change", published);
@@ -70,6 +73,7 @@ public class CommerceJourney
             using var scope = factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CommerceDbContext>();
             var ids = db.Stores.Where(s=>s.OwnerUserId==owner).Select(s=>s.Id);
+            await db.OrderEvents.Where(o=>ids.Contains(o.StoreId)).ExecuteDeleteAsync();
             await db.Orders.Where(o=>ids.Contains(o.StoreId)).ExecuteDeleteAsync();
             await db.PublishedPages.Where(p=>ids.Contains(p.StoreId)).ExecuteDeleteAsync();
             await db.Products.Where(p=>ids.Contains(p.StoreId)).ExecuteDeleteAsync();
@@ -86,12 +90,15 @@ public class CommerceJourney
 }
 public sealed class TestApplication : WebApplicationFactory<Program>
 {
+    private readonly bool production;
+    private readonly bool demoEnabled;
+    public TestApplication(bool production = false, bool demoEnabled = false) { this.production = production; this.demoEnabled = demoEnabled; }
     private readonly ECDsa signing = ECDsa.Create(ECCurve.NamedCurves.nistP256);
     private const string Issuer="https://pqwzqabkrwnkatqkgohl.supabase.co/auth/v1";
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
-        builder.ConfigureAppConfiguration((_,config)=>config.AddUserSecrets<CommerceDesignTimeFactory>(optional:false));
+        builder.UseEnvironment(production ? "Production" : "Development");
+        builder.ConfigureAppConfiguration((_,config)=>config.AddUserSecrets<CommerceDesignTimeFactory>(optional:false).AddInMemoryCollection(new Dictionary<string,string?> { ["Demo:Enabled"] = demoEnabled.ToString() }));
         builder.ConfigureServices(services=>services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme,options=>{
             var configuration=new OpenIdConnectConfiguration {Issuer=Issuer};
             configuration.SigningKeys.Add(new ECDsaSecurityKey(signing) {KeyId="integration-only"});

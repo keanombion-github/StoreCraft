@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: storecraft-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_HTTP_PORTS
+        value: "8080"
+      - key: Supabase__Url
+        value: https://pqwzqabkrwnkatqkgohl.supabase.co
+      - key: ConnectionStrings__Commerce
+        sync: false
+      - key: Demo__Enabled
+        value: "true"
+      - key: Demo__ConfirmationSecret
+        sync: false
+      - key: Cors__Origins__0
+        sync: false

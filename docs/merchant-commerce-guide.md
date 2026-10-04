@@ -42,7 +42,7 @@ Database integration checks verify ownership, publishing isolation, failed payme
 
 ## Current boundaries
 
-The checkout simulator works only in local Development. Deployment, production sandbox payments, product image uploads, richer public product search/details, a logo upload control, drag reordering, pickup, and OMS sync remain future work. Product cards currently use a sample photo. Widgets accept HTTPS images. Shipping currently uses Singapore and SGD. The original root dashboard and sunday-supply shop remain browser sandboxes.
+See [the theme milestone](storefront-themes.md) for the newer themes, regions, image/logo uploads, catalog, pickup, and order sync queue. The simulator now also works in an explicitly configured hosted demo. Live deployment and an actual OMS connection remain unverified; setup is prepared in [deployment.md](deployment.md). Shipping currently uses Singapore and SGD. The original root dashboard and sunday-supply shop remain browser sandboxes.
 
 For confirmation emails, set Supabase Auth Site URL to http://localhost:3000 and allow http://localhost:3000/merchant as a redirect URL.
 

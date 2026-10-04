@@ -15,6 +15,8 @@ export type StoreRecord = {
   shippingMinorUnits: number;
   freeShippingThreshold: number;
   publishedVersionId: string | null;
+  pickupEnabled?: boolean;
+  pickupAddress?: string;
 };
 export type CatalogProduct = {
   id: string;
@@ -25,20 +27,35 @@ export type CatalogProduct = {
   priceMinorUnits: number;
   stockQuantity: number;
   status: string;
+  imagePath?: string;
+  imageAlt?: string;
+  imageUrl?: string;
 };
 export type Section = {
   id: string;
-  type: "Hero" | "FeaturedProducts" | "ImageText" | "Announcement" | "Footer";
+  type:
+    | "Navigation"
+    | "Hero"
+    | "FeaturedProducts"
+    | "ImageText"
+    | "Announcement"
+    | "Footer";
   title: string;
   text: string;
   image: string;
   button: string;
+  region?: "Header" | "Main" | "Footer";
+  productIds?: string[];
 };
 export type PageDocument = {
   schemaVersion: number;
   accent: string;
   font: string;
   sections: Section[];
+  themeId?: "midnight" | "linen";
+  templateId?: "essentials" | "editorial";
+  logo?: string;
+  logoAlt?: string;
 };
 export type LiveOrder = {
   id: string;
@@ -55,6 +72,7 @@ export type LiveOrder = {
   subtotal: number;
   shipping: number;
   createdAt: string;
+  fulfillmentMethod?: string;
 };
 
 export async function request<T>(

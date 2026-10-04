@@ -49,3 +49,9 @@ Next.js 16.3.8, React 19.2.8, TypeScript 5.9.3, Tailwind 4.3.3, and Playwright 1
 The npm audit finds a development-only lint dependency advisory originating in braces with no current patch. Keep the matching Next lint configuration rather than force a major downgrade. Review the issue before deployment and record it in README.
 
 The .NET and database libraries will be verified and pinned when the API is scaffolded.
+
+## 2026-10-04 — Region-based themes and completion work
+
+Page schema 2 adds Midnight/Linen theme presets, Essentials/Editorial home layouts, Header/Main/Footer placement, logos, and featured product references. Legacy JSON is adapted during reads without rewriting snapshots. Theme selection keeps content; explicitly applying a template replaces draft widgets after confirmation. Native dragging supplements accessible move buttons.
+
+Supabase Storage uses a public, size/type-limited image bucket with insert-only account-folder ownership policy. Unique paths preserve published images. Checkout supports authoritative quotes, explicit hosted demo mode, free pickup, and transactionally saved OMS events. The OMS itself remains a separate future project. Netlify/Render deployment files and GitHub checks are prepared; provider access and live verification are still needed.

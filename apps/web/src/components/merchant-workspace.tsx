@@ -12,6 +12,7 @@ import {
 } from "@/lib/commerce";
 import { money } from "@/lib/demo-data";
 import { PageBuilder } from "./page-builder";
+import { ImageUpload, assetUrl } from "./image-upload";
 
 export function MerchantWorkspace() {
   const [session, setSession] = useState<Session | null>(null);
@@ -34,7 +35,7 @@ export function MerchantWorkspace() {
         Supabase configuration is missing. See the setup guide.
       </p>
     );
-  return session ? <MerchantDashboard session={session} /> : <Login />;
+  return session ? <MerchantDashboard key={session.user.id} session={session} /> : <Login />;
 }
 
 function Login() {
@@ -128,6 +129,8 @@ function MerchantDashboard({ session }: { session: Session }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState("Home");
+  const [builderDirty, setBuilderDirty] = useState(false);
+  const [syncEvents, setSyncEvents] = useState<number | null>(null);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   const [editor, setEditor] = useState<CatalogProduct | "new" | null>(null);
@@ -293,6 +296,15 @@ function MerchantDashboard({ session }: { session: Session }) {
                 key={item}
                 className={tab === item ? "nav-item selected" : "nav-item"}
                 onClick={() => {
+                  if (
+                    tab === "Page builder" &&
+                    builderDirty &&
+                    item !== tab &&
+                    !window.confirm(
+                      "Your draft has unsaved changes. Leave the editor? You can return to it during this session.",
+                    )
+                  )
+                    return;
                   setTab(item);
                   setError("");
                   setNotice("");
@@ -307,7 +319,13 @@ function MerchantDashboard({ session }: { session: Session }) {
           <small className="muted">{session.user.email}</small>
           <button
             className="quiet"
-            onClick={() => void supabase!.auth.signOut()}
+            onClick={() => {
+              if (
+                !builderDirty ||
+                window.confirm("Sign out and discard unsaved page changes?")
+              )
+                void supabase!.auth.signOut();
+            }}
           >
             Sign out
           </button>
@@ -514,7 +532,12 @@ function MerchantDashboard({ session }: { session: Session }) {
             </>
           )}
           <div hidden={tab !== "Page builder"}>
-            <PageBuilder store={store} products={products} />
+            <PageBuilder
+              store={store}
+              products={products}
+              onDirtyChange={setBuilderDirty}
+              onPublished={() => void load()}
+            />
           </div>
           {tab === "Settings" && (
             <form
@@ -535,6 +558,8 @@ function MerchantDashboard({ session }: { session: Session }) {
                         freeShippingThreshold: Math.round(
                           Number(values.get("threshold")) * 100,
                         ),
+                        pickupEnabled: values.get("pickupEnabled") === "on",
+                        pickupAddress: values.get("pickupAddress"),
                       }),
                     }),
                   "Store settings saved.",
@@ -591,6 +616,46 @@ function MerchantDashboard({ session }: { session: Session }) {
               <button className="primary" disabled={busy}>
                 Save settings
               </button>
+              <h2>Pickup in store</h2>
+              <label className="checkbox-label">
+                <input
+                  name="pickupEnabled"
+                  type="checkbox"
+                  defaultChecked={store.pickupEnabled}
+                />
+                Offer free pickup
+              </label>
+              <label>
+                Pickup address
+                <input
+                  name="pickupAddress"
+                  maxLength={300}
+                  defaultValue={store.pickupAddress ?? ""}
+                  placeholder="Where customers collect their orders"
+                />
+              </label>
+              <h2>Order sync</h2>
+              <p className="helper">
+                Orders and fulfillment changes are queued for your future OMS.
+                An OMS is not connected yet.
+              </p>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  void request<unknown[]>("/api/merchant/sync/events")
+                    .then((events) => setSyncEvents(events.length))
+                    .catch((failure) => setError(failure.message));
+                }}
+              >
+                Check queued updates
+              </button>
+              {syncEvents !== null && (
+                <p role="status">
+                  {syncEvents === 100 ? "100 or more" : syncEvents} updates
+                  awaiting an OMS.
+                </p>
+              )}
             </form>
           )}
           {tab === "Orders" && (
@@ -630,12 +695,16 @@ function CatalogForm({
   onClose: () => void;
   onSave: (values: object) => void;
 }) {
+  const [imagePath, setImagePath] = useState(product?.imagePath ?? "");
+  const [imageAlt, setImageAlt] = useState(product?.imageAlt ?? "");
+  const [uploading, setUploading] = useState(false);
   return (
     <form
       className="panel settings-form live-product-form"
       onSubmit={(event) => {
         event.preventDefault();
         const fields = new FormData(event.currentTarget);
+        if (uploading || busy) return;
         onSave({
           title: fields.get("title"),
           slug: fields.get("slug"),
@@ -644,6 +713,8 @@ function CatalogForm({
           priceMinorUnits: Math.round(Number(fields.get("price")) * 100),
           stockQuantity: Number(fields.get("stock")),
           status: fields.get("status"),
+          imagePath,
+          imageAlt,
         });
       }}
     >
@@ -680,6 +751,46 @@ function CatalogForm({
         SKU
         <input name="sku" maxLength={80} defaultValue={product?.sku} />
       </label>
+      <ImageUpload
+        value={imagePath}
+        onBusy={setUploading}
+        onChange={(path) => {
+          setImagePath(path);
+          if (!imageAlt) setImageAlt(product?.title ?? "Product photo");
+        }}
+      />
+      <label>
+        Image alternative text
+        <input
+          value={imageAlt}
+          maxLength={150}
+          required={!!imagePath}
+          onChange={(event) => setImageAlt(event.target.value)}
+        />
+      </label>
+      {imagePath && (
+        <button
+          type="button"
+          className="quiet"
+          disabled={uploading}
+          onClick={() => {
+            setImagePath("");
+            setImageAlt("");
+          }}
+        >
+          Remove product image
+        </button>
+      )}
+      {imagePath && (
+        <a
+          className="text-link"
+          href={assetUrl(imagePath)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View uploaded image
+        </a>
+      )}
       <div className="form-grid">
         <label>
           Price (SGD)
@@ -714,10 +825,15 @@ function CatalogForm({
         </select>
       </label>
       <div className="dialog-actions">
-        <button type="button" className="secondary" onClick={onClose}>
+        <button
+          type="button"
+          className="secondary"
+          disabled={uploading}
+          onClick={onClose}
+        >
           Cancel
         </button>
-        <button className="primary" disabled={busy}>
+        <button className="primary" disabled={busy || uploading}>
           Save product
         </button>
       </div>
@@ -766,6 +882,8 @@ function OrdersView({
             <option>Unfulfilled</option>
             <option>Shipped</option>
             <option>Delivered</option>
+            <option>ReadyForPickup</option>
+            <option>Collected</option>
           </select>
         </div>
         <div className="table-scroll">
@@ -823,11 +941,15 @@ function OrdersView({
             const fields = new FormData(event.currentTarget);
             onFulfill(
               current,
-              current.fulfillmentState === "Unfulfilled"
-                ? "Shipped"
-                : "Delivered",
-              String(fields.get("number")),
-              String(fields.get("url")),
+              current.fulfillmentMethod === "Pickup"
+                ? current.fulfillmentState === "Unfulfilled"
+                  ? "ReadyForPickup"
+                  : "Collected"
+                : current.fulfillmentState === "Unfulfilled"
+                  ? "Shipped"
+                  : "Delivered",
+              String(fields.get("number") ?? ""),
+              String(fields.get("url") ?? ""),
             );
           }}
         >
@@ -854,33 +976,42 @@ function OrdersView({
             Shipping {money(current.shipping)} · Total {money(current.total)}
           </p>
           <p>
-            {current.paymentState} · {current.fulfillmentState}
+            {current.paymentState} · {current.fulfillmentMethod ?? "Delivery"} ·{" "}
+            {current.fulfillmentState}
           </p>
           {current.paymentState === "Paid" &&
-            current.fulfillmentState !== "Delivered" && (
+            !["Delivered", "Collected"].includes(current.fulfillmentState) && (
               <>
-                <label>
-                  Tracking number
-                  <input
-                    name="number"
-                    required
-                    maxLength={100}
-                    defaultValue={current.trackingNumber}
-                  />
-                </label>
-                <label>
-                  Tracking URL (optional HTTPS)
-                  <input
-                    name="url"
-                    type="url"
-                    defaultValue={current.trackingUrl}
-                  />
-                </label>
+                {current.fulfillmentMethod !== "Pickup" && (
+                  <>
+                    <label>
+                      Tracking number
+                      <input
+                        name="number"
+                        required
+                        maxLength={100}
+                        defaultValue={current.trackingNumber}
+                      />
+                    </label>
+                    <label>
+                      Tracking URL (optional HTTPS)
+                      <input
+                        name="url"
+                        type="url"
+                        defaultValue={current.trackingUrl}
+                      />
+                    </label>
+                  </>
+                )}
                 <button className="primary" disabled={busy}>
                   Mark{" "}
-                  {current.fulfillmentState === "Unfulfilled"
-                    ? "shipped"
-                    : "delivered"}
+                  {current.fulfillmentMethod === "Pickup"
+                    ? current.fulfillmentState === "Unfulfilled"
+                      ? "ready for pickup"
+                      : "collected"
+                    : current.fulfillmentState === "Unfulfilled"
+                      ? "shipped"
+                      : "delivered"}
                 </button>
               </>
             )}

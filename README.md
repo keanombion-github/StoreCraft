@@ -6,6 +6,8 @@ A learning project for a merchant dashboard and customer storefront. StoreCraft 
 
 A persistent workspace at `/merchant` now connects Supabase Auth, the .NET API, and PostgreSQL. It includes products/settings, a prebuilt-widget builder with drafts and publishing, a public storefront in a new tab, local test checkout, receipts, and fulfillment tracking. The original `/` remains a browser sandbox. See [the commerce guide](docs/merchant-commerce-guide.md) for setup, changed files, verification, and remaining work.
 
+The builder now offers Midnight/Linen themes, Essentials/Editorial layouts, Header/Main/Footer regions, image/logo uploads, featured product selection, and drag/keyboard reordering. The public catalog supports search, pagination, and product details. Checkout supports delivery and free pickup, with API quotes and an order-event queue for a future OMS. Preview at `/themes`; read [the theme walkthrough](docs/storefront-themes.md) and [deployment setup](docs/deployment.md).
+
 See [docs/milestone-2-foundation.md](docs/milestone-2-foundation.md) for the API walkthrough and Supabase setup step. View store now opens the sample storefront in a new tab at `/s/sunday-supply`.
 
 The full scope and learning checkpoints are in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).

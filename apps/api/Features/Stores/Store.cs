@@ -14,4 +14,6 @@ public sealed class Store
     public long FreeShippingThreshold { get; set; } = 10000;
     public string? DraftDocument { get; set; }
     public Guid? PublishedVersionId { get; set; }
+    public bool PickupEnabled { get; set; }
+    public string PickupAddress { get; set; } = "";
 }

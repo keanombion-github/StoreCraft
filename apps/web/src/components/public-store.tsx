@@ -9,11 +9,13 @@ import {
 } from "@/lib/commerce";
 import { money } from "@/lib/demo-data";
 import { PageRenderer } from "./page-builder";
+import { normalizePage, regionOf } from "@/lib/storefront-themes";
 
 type PublicData = {
   store: StoreRecord;
   document: PageDocument;
   products: CatalogProduct[];
+  demoCheckoutEnabled?: boolean;
 };
 type Receipt = {
   reference: string;
@@ -21,6 +23,7 @@ type Receipt = {
   fulfillmentState: string;
   total: number;
   shipping: number;
+  fulfillmentMethod?: string;
   items: {
     productId: string;
     title: string;
@@ -30,25 +33,103 @@ type Receipt = {
 };
 
 const subscribe = () => () => {};
-export function PublicStore({ slug }: { slug: string }) {
-  const ready = useSyncExternalStore(subscribe, () => true, () => false);
-  return ready ? <HydratedStore key={slug} slug={slug} /> : <p className="loading">Opening the store…</p>;
+export function PublicStore({
+  slug,
+  catalogOnly = false,
+}: {
+  slug: string;
+  catalogOnly?: boolean;
+}) {
+  const ready = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
+  return ready ? (
+    <HydratedStore
+      key={`${slug}-${catalogOnly}`}
+      slug={slug}
+      catalogOnly={catalogOnly}
+    />
+  ) : (
+    <p className="loading">Opening the store…</p>
+  );
 }
-function HydratedStore({ slug }: { slug: string }) {
+function HydratedStore({
+  slug,
+  catalogOnly,
+}: {
+  slug: string;
+  catalogOnly: boolean;
+}) {
   const [data, setData] = useState<PublicData | null>(null);
   const [cart, setCart] = useState<Record<string, number>>(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(`storecraft-cart-${slug}`) ?? "{}");
-      if (saved && typeof saved === "object" && !Array.isArray(saved) && Object.values(saved).every(n => Number.isInteger(n) && Number(n) > 0 && Number(n) <= 99)) return saved;
-    } catch { /* Invalid saved carts reset. */ }
+      const saved = JSON.parse(
+        localStorage.getItem(`storecraft-cart-${slug}`) ?? "{}",
+      );
+      if (
+        saved &&
+        typeof saved === "object" &&
+        !Array.isArray(saved) &&
+        Object.values(saved).every(
+          (n) => Number.isInteger(n) && Number(n) > 0 && Number(n) <= 99,
+        )
+      )
+        return saved;
+    } catch {
+      /* Invalid saved carts reset. */
+    }
     return {};
   });
   const [cartOpen, setCartOpen] = useState(false);
+  const [fulfillmentMethod, setFulfillmentMethod] = useState("Delivery");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [confirmationError, setConfirmationError] = useState("");
+  const [quote, setQuote] = useState<{
+    key: string;
+    total: number;
+    subtotal: number;
+    shipping: number;
+  } | null>(null);
+  const [quoteFailure, setQuoteFailure] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
+  const [quoteAttempt, setQuoteAttempt] = useState(0);
+  const quoteKey = JSON.stringify({
+    items: Object.entries(cart).map(([productId, quantity]) => ({
+      productId,
+      quantity,
+    })),
+    country: "SG",
+    fulfillmentMethod,
+  });
+  useEffect(() => {
+    if (Object.keys(JSON.parse(quoteKey).items).length === 0) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      void request<{ total: number; subtotal: number; shipping: number }>(
+        `/api/public/stores/${encodeURIComponent(slug)}/quote`,
+        { method: "POST", body: quoteKey },
+        false,
+      )
+        .then((result) => {
+          if (active) setQuote({ ...result, key: quoteKey });
+        })
+        .catch((failure) => {
+          if (active)
+            setQuoteFailure({ key: quoteKey, message: failure.message });
+        });
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [quoteKey, slug, quoteAttempt]);
   async function load() {
     setError("");
     try {
@@ -64,8 +145,13 @@ function HydratedStore({ slug }: { slug: string }) {
     }
   }
   useEffect(() => {
-    void request<PublicData>(`/api/public/stores/${encodeURIComponent(slug)}`, {}, false)
-      .then(setData).catch(failure => setError(failure.message));
+    void request<PublicData>(
+      `/api/public/stores/${encodeURIComponent(slug)}`,
+      {},
+      false,
+    )
+      .then(setData)
+      .catch((failure) => setError(failure.message));
     const hash = new URLSearchParams(window.location.hash.slice(1));
     if (hash.get("order") && hash.get("token"))
       void request<Receipt>(
@@ -76,6 +162,12 @@ function HydratedStore({ slug }: { slug: string }) {
         .then(setReceipt)
         .catch((failure) => setConfirmationError(failure.message));
   }, [slug]);
+  useEffect(() => {
+    if (cartOpen)
+      document
+        .getElementById("checkout")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [cartOpen]);
   function updateCart(next: Record<string, number>) {
     setCart(next);
     setRequestId(crypto.randomUUID());
@@ -117,7 +209,9 @@ function HydratedStore({ slug }: { slug: string }) {
     0,
   );
   const shipping =
-    subtotal >= data.store.freeShippingThreshold || subtotal === 0
+    fulfillmentMethod === "Pickup" ||
+    subtotal >= data.store.freeShippingThreshold ||
+    subtotal === 0
       ? 0
       : data.store.shippingMinorUnits;
   const unavailable = Object.keys(cart).some(
@@ -126,6 +220,26 @@ function HydratedStore({ slug }: { slug: string }) {
         (product) => product.id === id && product.stockQuantity >= cart[id],
       ),
   );
+  const page = normalizePage(data.document);
+  const renderDocument: PageDocument = catalogOnly
+    ? {
+        ...page,
+        sections: [
+          ...page.sections.filter((section) => regionOf(section) === "Header"),
+          {
+            id: "complete-catalog",
+            type: "FeaturedProducts",
+            region: "Main",
+            title: "The full collection",
+            text: "Explore everything in the store.",
+            image: "",
+            button: "",
+            productIds: [],
+          },
+          ...page.sections.filter((section) => regionOf(section) === "Footer"),
+        ],
+      }
+    : page;
   return (
     <div className="shop published-shop">
       <div className="sandbox-bar">
@@ -152,6 +266,7 @@ function HydratedStore({ slug }: { slug: string }) {
           <p>
             Payment: {receipt.paymentState} · Fulfillment:{" "}
             {receipt.fulfillmentState}
+            {receipt.fulfillmentMethod && <> · {receipt.fulfillmentMethod}</>}
           </p>
           <p>
             Total: {money(receipt.total)} · Shipping: {money(receipt.shipping)}
@@ -178,9 +293,11 @@ function HydratedStore({ slug }: { slug: string }) {
         </section>
       )}
       <PageRenderer
-        document={data.document}
+        document={renderDocument}
         products={data.products}
         storeName={data.store.name}
+        contactEmail={data.store.contactEmail}
+        catalogHref={`/s/${slug}/catalog`}
         onAdd={(product) => {
           const next = Math.min(
             product.stockQuantity,
@@ -192,7 +309,7 @@ function HydratedStore({ slug }: { slug: string }) {
         }}
       />
       {cartOpen && (
-        <section className="panel checkout-panel">
+        <section className="panel checkout-panel" id="checkout">
           <div className="dialog-heading">
             <h2>Bag and test checkout</h2>
             <button className="quiet" onClick={() => setCartOpen(false)}>
@@ -257,6 +374,26 @@ function HydratedStore({ slug }: { slug: string }) {
                 {money(shipping)} · Estimated total{" "}
                 <strong>{money(subtotal + shipping)}</strong>
               </p>
+              {quote?.key === quoteKey ? (
+                <p className="info-note">
+                  Current total from the store:{" "}
+                  <strong>{money(quote.total)}</strong> · Shipping{" "}
+                  {money(quote.shipping)}. Availability is checked again when
+                  placing your order.
+                </p>
+              ) : quoteFailure?.key === quoteKey ? (
+                <div className="alert" role="alert">
+                  <p>{quoteFailure.message}</p>
+                  <button
+                    className="secondary"
+                    onClick={() => setQuoteAttempt((attempt) => attempt + 1)}
+                  >
+                    Retry quote
+                  </button>
+                </div>
+              ) : (
+                <p role="status">Checking current prices and availability…</p>
+              )}
               {unavailable && (
                 <p className="alert">
                   A product is unavailable or exceeds current stock. Adjust your
@@ -268,7 +405,7 @@ function HydratedStore({ slug }: { slug: string }) {
                 onChange={() => setRequestId(crypto.randomUUID())}
                 onSubmit={async (event) => {
                   event.preventDefault();
-                  if (busy) return;
+                  if (busy || quote?.key !== quoteKey || unavailable) return;
                   const fields = new FormData(event.currentTarget);
                   setBusy(true);
                   setError("");
@@ -287,10 +424,20 @@ function HydratedStore({ slug }: { slug: string }) {
                           ),
                           name: fields.get("name"),
                           email: fields.get("email"),
-                          street: fields.get("street"),
-                          city: fields.get("city"),
-                          postalCode: fields.get("postal"),
-                          country: fields.get("country"),
+                          street:
+                            fulfillmentMethod === "Pickup"
+                              ? "Pickup"
+                              : fields.get("street"),
+                          city:
+                            fulfillmentMethod === "Pickup"
+                              ? "Singapore"
+                              : fields.get("city"),
+                          postalCode:
+                            fulfillmentMethod === "Pickup"
+                              ? "N/A"
+                              : fields.get("postal"),
+                          country: "SG",
+                          fulfillmentMethod,
                           outcome: fields.get("outcome"),
                         }),
                       },
@@ -314,7 +461,8 @@ function HydratedStore({ slug }: { slug: string }) {
                         "Your order was recorded. Reload this confirmation link to retrieve its result.",
                       );
                     }
-                    updateCart({});
+                    if (fields.get("outcome") === "Paid") updateCart({});
+                    else setRequestId(crypto.randomUUID());
                     setCartOpen(false);
                     void load();
                   } catch (failure) {
@@ -325,6 +473,32 @@ function HydratedStore({ slug }: { slug: string }) {
                 }}
               >
                 <h3>Guest details</h3>
+                {data.demoCheckoutEnabled === false && (
+                  <p className="info-note">
+                    Test checkout is disabled on this deployment.
+                  </p>
+                )}
+                <label>
+                  How would you like your order?
+                  <select
+                    aria-label="Fulfillment method"
+                    value={fulfillmentMethod}
+                    onChange={(event) =>
+                      setFulfillmentMethod(event.target.value)
+                    }
+                  >
+                    <option value="Delivery">Delivery to Singapore</option>
+                    {data.store.pickupEnabled && (
+                      <option value="Pickup">Free pickup in store</option>
+                    )}
+                  </select>
+                </label>
+                {fulfillmentMethod === "Pickup" && (
+                  <p className="info-note">
+                    Collect from {data.store.pickupAddress}. Your merchant will
+                    mark the order ready for pickup.
+                  </p>
+                )}
                 <label>
                   Name
                   <input
@@ -344,42 +518,48 @@ function HydratedStore({ slug }: { slug: string }) {
                     autoComplete="email"
                   />
                 </label>
-                <label>
-                  Street address
-                  <input
-                    name="street"
-                    required
-                    maxLength={300}
-                    autoComplete="street-address"
-                  />
-                </label>
-                <div className="form-grid">
+                <fieldset
+                  className="shipping-address"
+                  hidden={fulfillmentMethod === "Pickup"}
+                  disabled={fulfillmentMethod === "Pickup"}
+                >
                   <label>
-                    City
+                    Street address
                     <input
-                      name="city"
+                      name="street"
                       required
-                      maxLength={100}
-                      autoComplete="address-level2"
-                      defaultValue="Singapore"
+                      maxLength={300}
+                      autoComplete="street-address"
                     />
                   </label>
+                  <div className="form-grid">
+                    <label>
+                      City
+                      <input
+                        name="city"
+                        required
+                        maxLength={100}
+                        autoComplete="address-level2"
+                        defaultValue="Singapore"
+                      />
+                    </label>
+                    <label>
+                      Postal code
+                      <input
+                        name="postal"
+                        required
+                        maxLength={20}
+                        autoComplete="postal-code"
+                      />
+                    </label>
+                  </div>
                   <label>
-                    Postal code
-                    <input
-                      name="postal"
-                      required
-                      maxLength={20}
-                      autoComplete="postal-code"
-                    />
+                    Destination
+                    <select name="country">
+                      <option value="SG">Singapore</option>
+                    </select>
                   </label>
-                </div>
-                <label>
-                  Destination
-                  <select name="country">
-                    <option value="SG">Singapore</option>
-                  </select>
-                </label>
+                </fieldset>
                 <label>
                   Test payment outcome
                   <select name="outcome">
@@ -392,7 +572,15 @@ function HydratedStore({ slug }: { slug: string }) {
                   moves. The API recalculates prices, shipping, and
                   availability. Tax calculation is outside this demo’s scope.
                 </p>
-                <button className="primary" disabled={busy || unavailable}>
+                <button
+                  className="primary"
+                  disabled={
+                    busy ||
+                    unavailable ||
+                    quote?.key !== quoteKey ||
+                    data.demoCheckoutEnabled === false
+                  }
+                >
                   {busy ? "Processing test payment…" : "Place test order"}
                 </button>
               </form>

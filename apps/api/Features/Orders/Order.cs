@@ -20,5 +20,6 @@ public sealed class Order
     public string TrackingNumber { get; set; } = "";
     public string TrackingUrl { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public string FulfillmentMethod { get; set; } = "Delivery";
 }
 public sealed record PurchasedItem(Guid ProductId, string Title, string Sku, int Quantity, long UnitPrice);

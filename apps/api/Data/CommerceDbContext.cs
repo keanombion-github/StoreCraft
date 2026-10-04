@@ -12,6 +12,7 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
     public DbSet<Product> Products => Set<Product>();
     public DbSet<PublishedPage> PublishedPages => Set<PublishedPage>();
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderEvent> OrderEvents => Set<OrderEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -27,6 +28,7 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
         stores.Property(store => store.ContactEmail).HasMaxLength(254);
         stores.Property(store => store.Currency).HasMaxLength(3);
         stores.Property(store => store.DraftDocument).HasColumnType("jsonb");
+        stores.Property(store => store.PickupAddress).HasMaxLength(300);
         stores.ToTable("Stores", table => { table.HasCheckConstraint("CK_Stores_Shipping", "\"ShippingMinorUnits\" >= 0"); table.HasCheckConstraint("CK_Stores_Threshold", "\"FreeShippingThreshold\" > 0"); });
 
         var pages = model.Entity<PublishedPage>();
@@ -35,6 +37,13 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
         pages.HasOne<Store>().WithMany().HasForeignKey(page => page.StoreId).OnDelete(DeleteBehavior.Restrict);
 
         var orders = model.Entity<Order>();
+        var events = model.Entity<OrderEvent>();
+        events.HasKey(e => e.Id);
+        events.HasIndex(e => new { e.StoreId, e.AcknowledgedAt, e.Id });
+        events.Property(e => e.Payload).HasColumnType("jsonb");
+        events.Property(e => e.Type).HasMaxLength(50);
+        events.HasOne<Store>().WithMany().HasForeignKey(e => e.StoreId).OnDelete(DeleteBehavior.Restrict);
+        events.HasOne<Order>().WithMany().HasForeignKey(e => e.OrderId).OnDelete(DeleteBehavior.Restrict);
         orders.HasKey(order => order.Id);
         orders.HasIndex(order => new { order.StoreId, order.IdempotencyKey }).IsUnique();
         orders.HasOne<Store>().WithMany().HasForeignKey(order => order.StoreId).OnDelete(DeleteBehavior.Restrict);
@@ -42,7 +51,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
         orders.Property(order => order.CustomerName).HasMaxLength(100);
         orders.Property(order => order.CustomerEmail).HasMaxLength(254);
         orders.Property(order => order.Address).HasMaxLength(1000);
-        orders.ToTable("Orders", table => { table.HasCheckConstraint("CK_Orders_Total", "\"Subtotal\" >= 0 AND \"Shipping\" >= 0 AND \"Total\" = \"Subtotal\" + \"Shipping\""); table.HasCheckConstraint("CK_Orders_Payment", "\"PaymentState\" IN ('Paid', 'Failed')"); table.HasCheckConstraint("CK_Orders_Fulfillment", "\"FulfillmentState\" IN ('Unfulfilled', 'Shipped', 'Delivered')"); });
+        orders.Property(order => order.FulfillmentMethod).HasMaxLength(16);
+        orders.ToTable("Orders", table => { table.HasCheckConstraint("CK_Orders_Method", "\"FulfillmentMethod\" IN ('Delivery', 'Pickup')"); table.HasCheckConstraint("CK_Orders_Total", "\"Subtotal\" >= 0 AND \"Shipping\" >= 0 AND \"Total\" = \"Subtotal\" + \"Shipping\""); table.HasCheckConstraint("CK_Orders_Payment", "\"PaymentState\" IN ('Paid', 'Failed')"); table.HasCheckConstraint("CK_Orders_Fulfillment", "\"FulfillmentState\" IN ('Unfulfilled', 'Shipped', 'Delivered', 'ReadyForPickup', 'Collected')"); });
 
         var products = model.Entity<Product>();
         products.ToTable("Products", table =>
@@ -59,6 +69,8 @@ public sealed class CommerceDbContext(DbContextOptions<CommerceDbContext> option
         products.Property(product => product.Slug).HasMaxLength(120);
         products.Property(product => product.Description).HasMaxLength(4000);
         products.Property(product => product.Sku).HasMaxLength(80);
+        products.Property(product => product.ImagePath).HasMaxLength(200);
+        products.Property(product => product.ImageAlt).HasMaxLength(150);
         products.Property(product => product.Status).HasConversion<string>().HasMaxLength(16);
     }
 }

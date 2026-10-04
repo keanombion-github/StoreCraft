@@ -6,7 +6,7 @@ using StoreCraft.Api.Features.Stores;
 
 namespace StoreCraft.Api.Features.Products;
 
-public sealed record ProductRequest(string Title, string Slug, string Description, string Sku, long PriceMinorUnits, int StockQuantity, string Status);
+public sealed record ProductRequest(string Title, string Slug, string Description, string Sku, long PriceMinorUnits, int StockQuantity, string Status, string ImagePath = "", string ImageAlt = "");
 
 public static partial class ProductEndpoints
 {
@@ -25,8 +25,10 @@ public static partial class ProductEndpoints
             var owner = StoreEndpoints.Owner(user);
             var storeId = await db.Stores.Where(store => store.OwnerUserId == owner).Select(store => (Guid?)store.Id).SingleOrDefaultAsync();
             if (storeId is null) return Results.NotFound();
+            if (!ValidImage(input, owner)) return Results.BadRequest(new { error = "Select an image uploaded by your account and provide alternative text." });
             var product = new Product { Id = Guid.NewGuid(), StoreId = storeId.Value, Title = input.Title.Trim(), Slug = input.Slug, Description = input.Description.Trim(), Sku = input.Sku.Trim(), PriceMinorUnits = input.PriceMinorUnits, StockQuantity = input.StockQuantity, Status = Enum.Parse<ProductStatus>(input.Status), CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
             db.Products.Add(product);
+            product.ImagePath = input.ImagePath; product.ImageAlt = input.ImageAlt;
             try { await db.SaveChangesAsync(); }
             catch (DbUpdateException exception) when (exception.InnerException is Npgsql.PostgresException { SqlState: "23505" }) { return Results.Conflict(new { error = "A product with that slug already exists in your store." }); }
             return Results.Created($"/api/merchant/products/{product.Id}", product);
@@ -36,10 +38,12 @@ public static partial class ProductEndpoints
             if (Validate(input) is { } error) return Results.BadRequest(new { error });
             var owner = StoreEndpoints.Owner(user);
             // Join ownership into the resource query; never authorize an ID supplied by the browser alone.
+            if (!ValidImage(input, owner)) return Results.BadRequest(new { error = "Select an image uploaded by your account and provide alternative text." });
             var product = await db.Products.SingleOrDefaultAsync(product => product.Id == id && db.Stores.Any(store => store.Id == product.StoreId && store.OwnerUserId == owner));
             if (product is null) return Results.NotFound();
             product.Title = input.Title.Trim(); product.Slug = input.Slug; product.Description = input.Description.Trim(); product.Sku = input.Sku.Trim();
             product.PriceMinorUnits = input.PriceMinorUnits; product.StockQuantity = input.StockQuantity; product.Status = Enum.Parse<ProductStatus>(input.Status); product.UpdatedAt = DateTimeOffset.UtcNow;
+            product.ImagePath = input.ImagePath; product.ImageAlt = input.ImageAlt;
             try { await db.SaveChangesAsync(); }
             catch (DbUpdateException exception) when (exception.InnerException is Npgsql.PostgresException { SqlState: "23505" }) { return Results.Conflict(new { error = "A product with that slug already exists in your store." }); }
             return Results.Ok(product);
@@ -57,4 +61,5 @@ public static partial class ProductEndpoints
 
     [GeneratedRegex("^[a-z0-9][a-z0-9-]{1,118}[a-z0-9]$")]
     private static partial Regex SlugPattern();
+    public static bool ValidImage(ProductRequest input, Guid owner) => input.ImagePath is not null && input.ImageAlt is not null && input.ImageAlt.Length <= 150 && (input.ImagePath.Length == 0 || (!string.IsNullOrWhiteSpace(input.ImageAlt) && Regex.IsMatch(input.ImagePath, "^" + owner.ToString() + @"/[a-f0-9-]{36}\.(jpg|png|webp)$")));
 }
