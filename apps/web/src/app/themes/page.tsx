@@ -22,7 +22,7 @@ export default function ThemeGallery() {
   return (
     <main className="theme-gallery">
       <header className="theme-gallery-toolbar">
-        <Link href="/merchant" className="brand">
+        <Link href="/" className="brand">
           StoreCraft
         </Link>
         <span>Storefront theme preview</span>
@@ -50,8 +50,8 @@ export default function ThemeGallery() {
             <option value="editorial">Editorial</option>
           </select>
         </label>
-        <Link href="/merchant" className="text-link">
-          Use a theme in your store ↗
+        <Link href="/" className="text-link">
+          Try the demo page builder ↗
         </Link>
       </header>
       <PageRenderer

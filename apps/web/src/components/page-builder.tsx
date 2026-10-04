@@ -18,6 +18,7 @@ import {
 } from "@/lib/storefront-themes";
 import { ImageUpload } from "./image-upload";
 import { PageRenderer } from "./storefront-renderer";
+import { readDemoPage } from "@/lib/demo-page";
 export { PageRenderer } from "./storefront-renderer";
 
 export function PageBuilder({
@@ -25,11 +26,13 @@ export function PageBuilder({
   products,
   onDirtyChange,
   onPublished,
+  demo = false,
 }: {
   store: StoreRecord;
   products: CatalogProduct[];
   onDirtyChange?: (dirty: boolean) => void;
   onPublished?: () => void;
+  demo?: boolean;
 }) {
   const [document, setDocument] = useState<PageDocument | null>(null);
   const [selected, setSelected] = useState("");
@@ -49,7 +52,11 @@ export function PageBuilder({
   }, [dirty, uploading, onDirtyChange]);
   useEffect(() => {
     let active = true;
-    void request<{ document: PageDocument }>("/api/merchant/page")
+    void (
+      demo
+        ? Promise.resolve({ document: readDemoPage() })
+        : request<{ document: PageDocument }>("/api/merchant/page")
+    )
       .then((page) => {
         if (!active) return;
         const normalized = normalizePage(page.document);
@@ -64,7 +71,7 @@ export function PageBuilder({
     return () => {
       active = false;
     };
-  }, []);
+  }, [demo]);
   useEffect(() => {
     if (!dirty && !uploading) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -87,20 +94,36 @@ export function PageBuilder({
     setBusy(true);
     setError("");
     try {
-      await request(
-        publish ? "/api/merchant/page/publish" : "/api/merchant/page",
-        { method: publish ? "POST" : "PUT", body: JSON.stringify(document) },
-      );
+      if (demo) {
+        localStorage.setItem("storecraft-demo-draft", JSON.stringify(document));
+        if (publish)
+          localStorage.setItem(
+            "storecraft-demo-published",
+            JSON.stringify(document),
+          );
+      } else
+        await request(
+          publish ? "/api/merchant/page/publish" : "/api/merchant/page",
+          { method: publish ? "POST" : "PUT", body: JSON.stringify(document) },
+        );
       setDirty(false);
       onDirtyChange?.(false);
       setMessage(
-        publish
-          ? "Published. Your public shop now uses this design."
-          : "Draft saved. Your published shop is unchanged.",
+        demo
+          ? publish
+            ? "Published for your browser demo. Open View store to see it."
+            : "Draft saved in this browser."
+          : publish
+            ? "Published. Your public shop now uses this design."
+            : "Draft saved. Your published shop is unchanged.",
       );
       if (publish) onPublished?.();
     } catch (failure) {
-      setError((failure as Error).message);
+      setError(
+        demo
+          ? "Browser saving failed. Storage may be full or disabled; try a smaller image."
+          : (failure as Error).message,
+      );
     } finally {
       setBusy(false);
     }
@@ -484,6 +507,7 @@ export function PageBuilder({
               </select>
             </label>
             <ImageUpload
+              localOnly={demo}
               label="Upload store logo"
               value={document.logo ?? ""}
               onBusy={(value) => {
@@ -561,6 +585,7 @@ export function PageBuilder({
                 {["Hero", "ImageText"].includes(section.type) && (
                   <>
                     <ImageUpload
+                      localOnly={demo}
                       value={section.image}
                       onBusy={(value) => {
                         setUploading(value);

@@ -13,6 +13,14 @@ import {
 import { money } from "@/lib/demo-data";
 import { PageBuilder } from "./page-builder";
 import { ImageUpload, assetUrl } from "./image-upload";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHouse,
+  faBox,
+  faReceipt,
+  faWandMagicSparkles,
+  faGear,
+} from "@fortawesome/free-solid-svg-icons";
 
 export function MerchantWorkspace() {
   const [session, setSession] = useState<Session | null>(null);
@@ -35,7 +43,11 @@ export function MerchantWorkspace() {
         Supabase configuration is missing. See the setup guide.
       </p>
     );
-  return session ? <MerchantDashboard key={session.user.id} session={session} /> : <Login />;
+  return session ? (
+    <MerchantDashboard key={session.user.id} session={session} />
+  ) : (
+    <Login />
+  );
 }
 
 function Login() {
@@ -310,6 +322,22 @@ function MerchantDashboard({ session }: { session: Session }) {
                   setNotice("");
                 }}
               >
+                <span aria-hidden="true">
+                  <FontAwesomeIcon
+                    icon={
+                      item === "Home"
+                        ? faHouse
+                        : item === "Products"
+                          ? faBox
+                          : item === "Orders"
+                            ? faReceipt
+                            : item === "Page builder"
+                              ? faWandMagicSparkles
+                              : faGear
+                    }
+                    style={{ width: "1em", height: "1em" }}
+                  />
+                </span>
                 {item}
               </button>
             ),

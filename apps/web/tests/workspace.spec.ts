@@ -26,7 +26,7 @@ test("product changes survive reload and active visibility controls storefront",
   ).toBeVisible();
   page = await openStore(page);
   await expect(
-    page.getByRole("button", { name: "Learning mug", exact: true }),
+    page.getByRole("button", { name: "View Learning mug", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Back to dashboard" }).click();
   await page.getByRole("button", { name: "Products", exact: true }).click();
@@ -37,10 +37,10 @@ test("product changes survive reload and active visibility controls storefront",
   await page.getByRole("button", { name: "Save product" }).click();
   page = await openStore(page);
   await expect(
-    page.getByRole("button", { name: "Learning mug", exact: true }),
+    page.getByRole("button", { name: "View Learning mug", exact: true }),
   ).toBeVisible();
   const product = page.locator("article").filter({
-    has: page.getByRole("button", { name: "Learning mug", exact: true }),
+    has: page.getByRole("button", { name: "View Learning mug", exact: true }),
   });
   await product.getByRole("button", { name: "Add to bag" }).click();
   await page.getByRole("button", { name: "Bag (1)", exact: true }).click();
@@ -91,7 +91,7 @@ test("settings, navigation, failed payment handling and responsive layout", asyn
   await expect(
     page.getByRole("heading", { name: "Overview dashboard" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Storefront", exact: true }).click();
+  await page.getByRole("button", { name: "Page builder", exact: true }).click();
   await expect(
     page.getByRole("heading", {
       name: "Everyday things. A little more considered.",
@@ -117,7 +117,7 @@ test("settings, navigation, failed payment handling and responsive layout", asyn
     fullPage: true,
   });
   page = await openStore(page);
-  await expect(page.getByRole("banner")).toContainText("Kean’s Corner");
+  await expect(page.locator(".store-wordmark")).toContainText("Kean’s Corner");
   await expect(
     page.getByRole("button", {
       name: "View Quiet moments notebook",

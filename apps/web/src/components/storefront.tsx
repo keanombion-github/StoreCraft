@@ -1,15 +1,20 @@
 /* eslint-disable @next/next/no-img-element -- Remote demo photography. */
 import { useEffect, useRef, useState } from "react";
 import { money, photo, type Product, type Settings } from "@/lib/demo-data";
+import type { PageDocument } from "@/lib/commerce";
+import { demoCatalog } from "@/lib/demo-page";
+import { PageRenderer } from "./storefront-renderer";
 
 export function Shop({
   products,
   settings,
   onBack,
+  page,
 }: {
   products: Product[];
   settings: Settings;
   onBack: () => void;
+  page?: PageDocument;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [cartOpen, setCartOpen] = useState(false);
@@ -36,111 +41,128 @@ export function Shop({
       <div className="sandbox-bar">
         <button onClick={onBack}>← Back to dashboard</button>
         <span>Sample storefront · Demo only</span>
+        {page && (
+          <button onClick={() => setCartOpen(true)}>Bag ({quantity})</button>
+        )}
       </div>
-      <div className="announcement">
-        A little thoughtfulness goes a long way. Free Singapore shipping from{" "}
-        {money(settings.threshold)}.
-      </div>
-      <header className="shop-header">
-        <a href="#collection">Shop the collection</a>
-        <strong>{settings.name}</strong>
-        <button onClick={() => setCartOpen(true)}>Bag ({quantity})</button>
-      </header>
-      <main>
-        <section className="shop-hero">
-          <div className="hero-copy">
-            <span className="eyebrow">LESS, BUT LOVELIER.</span>
-            <h1>
-              Everyday things.
-              <br />
-              <em>
-                A little more
-                <br />
-                considered.
-              </em>
-            </h1>
-            <p>
-              Thoughtful essentials for slow mornings,
-              <br />
-              comfortable spaces, and living well.
-            </p>
-            <a className="shop-button" href="#collection">
-              Discover the collection ↗
-            </a>
-            <small>Simple things. Lasting favorites.</small>
+      {page ? (
+        <PageRenderer
+          document={page}
+          products={demoCatalog(products)}
+          storeName={settings.name}
+          onAdd={(product) => {
+            const original = products.find((p) => p.id === product.id);
+            if (original) add(original);
+          }}
+        />
+      ) : (
+        <>
+          <div className="announcement">
+            A little thoughtfulness goes a long way. Free Singapore shipping
+            from {money(settings.threshold)}.
           </div>
-          <div className="hero-image">
-            <img
-              src={photo("photo-1600210492486-724fe5c67fb0", 1400)}
-              alt="A warm living room with natural furniture"
-            />
-            <span>Room to slow down.</span>
-          </div>
-        </section>
-        <section id="collection" className="collection">
-          <div className="collection-heading">
-            <div>
-              <span className="eyebrow">THE EVERYDAY EDIT</span>
-              <h2>Find your new favorite.</h2>
-            </div>
-            <label className="search">
-              <span>⌕</span>
-              <input
-                aria-label="Search storefront products"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search collection…"
-              />
-            </label>
-          </div>
-          <div className="product-grid">
-            {shown.map((p) => (
-              <article key={p.id} className="shop-product">
-                <button
-                  className="shop-photo"
-                  onClick={() => setSelected(p)}
-                  aria-label={`View ${p.title}`}
-                >
-                  <img src={photo(p.image, 800)} alt={p.title} />
-                  {p.stock === 0 && <span>Sold out</span>}
-                </button>
-                <div className="shop-product-title">
-                  <button onClick={() => setSelected(p)}>{p.title}</button>
-                  <span>{money(p.price)}</span>
+          <header className="shop-header">
+            <a href="#collection">Shop the collection</a>
+            <strong>{settings.name}</strong>
+            <button onClick={() => setCartOpen(true)}>Bag ({quantity})</button>
+          </header>
+          <main>
+            <section className="shop-hero">
+              <div className="hero-copy">
+                <span className="eyebrow">LESS, BUT LOVELIER.</span>
+                <h1>
+                  Everyday things.
+                  <br />
+                  <em>
+                    A little more
+                    <br />
+                    considered.
+                  </em>
+                </h1>
+                <p>
+                  Thoughtful essentials for slow mornings,
+                  <br />
+                  comfortable spaces, and living well.
+                </p>
+                <a className="shop-button" href="#collection">
+                  Discover the collection ↗
+                </a>
+                <small>Simple things. Lasting favorites.</small>
+              </div>
+              <div className="hero-image">
+                <img
+                  src={photo("photo-1600210492486-724fe5c67fb0", 1400)}
+                  alt="A warm living room with natural furniture"
+                />
+                <span>Room to slow down.</span>
+              </div>
+            </section>
+            <section id="collection" className="collection">
+              <div className="collection-heading">
+                <div>
+                  <span className="eyebrow">THE EVERYDAY EDIT</span>
+                  <h2>Find your new favorite.</h2>
                 </div>
-                <small>{p.category}</small>
-                <button
-                  className="add-bag"
-                  disabled={p.stock === 0 || (cart[p.id] ?? 0) >= p.stock}
-                  onClick={() => add(p)}
-                >
-                  {p.stock === 0
-                    ? "Out of stock"
-                    : (cart[p.id] ?? 0) >= p.stock
-                      ? "Stock limit reached"
-                      : "Add to bag +"}
-                </button>
-              </article>
-            ))}
-          </div>
-          {shown.length === 0 && (
-            <p className="empty-state">No products match your search.</p>
-          )}
-        </section>
-        <div className="shop-values">
-          <span>✳ Thoughtfully selected</span>
-          <span>◇ Everyday quality</span>
-          <span>♡ A little more considered</span>
-        </div>
-      </main>
-      <footer className="shop-footer">
-        <strong>{settings.name}</strong>
-        <p>Good things for everyday living.</p>
-        <a href={`mailto:${settings.email}`}>{settings.email}</a>
-        <small>
-          Fictional shop · SGD prices · Tax calculation outside demo scope
-        </small>
-      </footer>
+                <label className="search">
+                  <span>⌕</span>
+                  <input
+                    aria-label="Search storefront products"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search collection…"
+                  />
+                </label>
+              </div>
+              <div className="product-grid">
+                {shown.map((p) => (
+                  <article key={p.id} className="shop-product">
+                    <button
+                      className="shop-photo"
+                      onClick={() => setSelected(p)}
+                      aria-label={`View ${p.title}`}
+                    >
+                      <img src={photo(p.image, 800)} alt={p.title} />
+                      {p.stock === 0 && <span>Sold out</span>}
+                    </button>
+                    <div className="shop-product-title">
+                      <button onClick={() => setSelected(p)}>{p.title}</button>
+                      <span>{money(p.price)}</span>
+                    </div>
+                    <small>{p.category}</small>
+                    <button
+                      className="add-bag"
+                      disabled={p.stock === 0 || (cart[p.id] ?? 0) >= p.stock}
+                      onClick={() => add(p)}
+                    >
+                      {p.stock === 0
+                        ? "Out of stock"
+                        : (cart[p.id] ?? 0) >= p.stock
+                          ? "Stock limit reached"
+                          : "Add to bag +"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+              {shown.length === 0 && (
+                <p className="empty-state">No products match your search.</p>
+              )}
+            </section>
+            <div className="shop-values">
+              <span>✳ Thoughtfully selected</span>
+              <span>◇ Everyday quality</span>
+              <span>♡ A little more considered</span>
+            </div>
+          </main>
+          <footer className="shop-footer">
+            <strong>{settings.name}</strong>
+            <p>Good things for everyday living.</p>
+            <a href={`mailto:${settings.email}`}>{settings.email}</a>
+            <small>
+              Fictional shop · SGD prices · Tax calculation outside demo scope
+            </small>
+          </footer>
+        </>
+      )}
       {(cartOpen || selected) && (
         <ShopDialog
           title={selected ? selected.title : "Your bag"}

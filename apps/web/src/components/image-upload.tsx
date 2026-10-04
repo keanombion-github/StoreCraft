@@ -14,11 +14,13 @@ export function ImageUpload({
   onChange,
   onBusy,
   label = "Upload image",
+  localOnly = false,
 }: {
   value: string;
   onChange: (path: string, url: string) => void;
   onBusy?: (busy: boolean) => void;
   label?: string;
+  localOnly?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +28,11 @@ export function ImageUpload({
     <div className="image-upload">
       {value && (
         <img
-          src={value.startsWith("https://") ? value : assetUrl(value)}
+          src={
+            value.startsWith("https://") || value.startsWith("data:image/")
+              ? value
+              : assetUrl(value)
+          }
           alt="Current uploaded image preview"
         />
       )}
@@ -61,6 +67,21 @@ export function ImageUpload({
                 );
               }
               bitmap.close();
+              if (localOnly) {
+                if (file.size > 1024 * 1024)
+                  throw new Error(
+                    "For the browser demo, choose an image up to 1 MB.",
+                  );
+                const url = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.onerror = () =>
+                    reject(new Error("Could not read this image."));
+                  reader.readAsDataURL(file);
+                });
+                onChange("", url);
+                return;
+              }
               const session = await supabase?.auth.getSession();
               const owner = session?.data.session?.user.id;
               if (!supabase || !owner)

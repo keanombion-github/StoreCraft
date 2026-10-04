@@ -16,14 +16,25 @@ import {
 import { ProductEditor, SettingsForm } from "./store-forms";
 import { Shop } from "./storefront";
 import { OverviewCards } from "./overview-cards";
+import { PageBuilder } from "./page-builder";
+import { demoCatalog, readDemoPage } from "@/lib/demo-page";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHouse,
+  faBox,
+  faReceipt,
+  faWandMagicSparkles,
+  faGear,
+} from "@fortawesome/free-solid-svg-icons";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 
-type View = "Home" | "Products" | "Orders" | "Storefront" | "Settings";
-const navigation: { name: View; icon: string }[] = [
-  { name: "Home", icon: "⌂" },
-  { name: "Products", icon: "▦" },
-  { name: "Orders", icon: "▤" },
-  { name: "Storefront", icon: "◫" },
-  { name: "Settings", icon: "⚙" },
+type View = "Home" | "Products" | "Orders" | "Page builder" | "Settings";
+const navigation: { name: View; icon: IconDefinition }[] = [
+  { name: "Home", icon: faHouse },
+  { name: "Products", icon: faBox },
+  { name: "Orders", icon: faReceipt },
+  { name: "Page builder", icon: faWandMagicSparkles },
+  { name: "Settings", icon: faGear },
 ];
 const subscribe = () => () => {};
 
@@ -88,6 +99,8 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
   const [notice, setNotice] = useState("");
   const [storageError, setStorageError] = useState(false);
   const [editor, setEditor] = useState<Product | "new" | null>(null);
+  const [publishedPage] = useState(() => readDemoPage(true));
+  const [builderDirty, setBuilderDirty] = useState(false);
   function openStore() {
     window.open("/s/sunday-supply", "_blank", "noopener,noreferrer");
   }
@@ -120,6 +133,7 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
       <Shop
         products={active}
         settings={settings}
+        page={publishedPage}
         onBack={() => {
           router.push("/");
         }}
@@ -144,11 +158,25 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
               className={view === item.name ? "nav-item selected" : "nav-item"}
               aria-current={view === item.name ? "page" : undefined}
               onClick={() => {
+                if (
+                  builderDirty &&
+                  view === "Page builder" &&
+                  item.name !== view &&
+                  !window.confirm(
+                    "Leave the builder without saving your changes?",
+                  )
+                )
+                  return;
                 setView(item.name);
                 setNotice("");
               }}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <span aria-hidden="true">
+                <FontAwesomeIcon
+                  icon={item.icon}
+                  style={{ width: "1em", height: "1em" }}
+                />
+              </span>
               {item.name}
               {item.name === "Orders" && (
                 <b>
@@ -220,7 +248,9 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
           <button className="quiet" onClick={() => openStore()}>
             View store ↗
           </button>
-          <Link className="quiet" href="/merchant">Merchant sign in</Link>
+          <Link className="quiet" href="/themes">
+            Themes
+          </Link>
         </header>
         <main
           className={view === "Home" ? "content home-dashboard" : "content"}
@@ -250,7 +280,8 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
                     Products:
                       "Manage your catalog, inventory, and product visibility.",
                     Orders: "From purchase to doorstep, one order at a time.",
-                    Storefront: "A thoughtful space for the things you make.",
+                    "Page builder":
+                      "Choose a theme and make this storefront yours.",
                     Settings: "Manage store details and shipping rates.",
                   }[view]
                 }
@@ -554,43 +585,23 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
             </>
           )}
 
-          {view === "Storefront" && (
-            <>
-              <div className="panel">
-                <div className="preview-top">
-                  <span className="dot" />
-                  Sample storefront <span>Preview only</span>
-                </div>
-                <div className="mini-shop">
-                  <small>{settings.name.toUpperCase()}</small>
-                  <h2>
-                    Everyday things.
-                    <br />A little more considered.
-                  </h2>
-                  <p>
-                    Thoughtful essentials for slow mornings and living well.
-                  </p>
-                  <button className="primary" onClick={() => openStore()}>
-                    Explore your storefront ↗
-                  </button>
-                </div>
-              </div>
-              <div className="panel info-card">
-                <h2>The start of something yours.</h2>
-                <p>
-                  This preview renders your active products and store name. The
-                  section editor, draft saving, and publishing will arrive in
-                  the builder milestone.
-                </p>
-                <button
-                  className="secondary"
-                  onClick={() => setView("Settings")}
-                >
-                  Edit store details
-                </button>
-              </div>
-            </>
-          )}
+          <div hidden={view !== "Page builder"}>
+            <PageBuilder
+              demo
+              products={demoCatalog(products)}
+              onDirtyChange={setBuilderDirty}
+              store={{
+                id: "demo",
+                name: settings.name,
+                slug: "sunday-supply",
+                contactEmail: settings.email,
+                currency: "SGD",
+                shippingMinorUnits: settings.shipping,
+                freeShippingThreshold: settings.threshold,
+                publishedVersionId: null,
+              }}
+            />
+          </div>
 
           {view === "Settings" && (
             <SettingsForm
