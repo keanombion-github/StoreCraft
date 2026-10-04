@@ -195,6 +195,26 @@ export function PageBuilder({
     setRegion(targetRegion);
     setSelected(id);
   }
+  function canDelete(id: string) {
+    const item = document!.sections.find((s) => s.id === id);
+    return (
+      !!item &&
+      !locked &&
+      !(
+        regionOf(item) === "Main" &&
+        document!.sections.filter((s) => regionOf(s) === "Main").length === 1
+      )
+    );
+  }
+  function deleteWidget(id: string) {
+    if (!canDelete(id)) return;
+    change({
+      ...document!,
+      sections: document!.sections.filter((s) => s.id !== id),
+    });
+    if (selected === id) setSelected("");
+    setError("");
+  }
   function addWidget(
     type: Section["type"],
     targetRegion: Region,
@@ -398,16 +418,18 @@ export function PageBuilder({
                       <button
                         key={type}
                         className="widget-library-card"
-                        draggable={!locked && !singleton}
+                        draggable={!locked}
                         disabled={locked}
                         aria-label={`Add ${type} to ${r}`}
                         onDragStart={(event) => {
-                          event.dataTransfer.setData(
-                            "text/plain",
-                            `new:${type}`,
-                          );
-                          event.dataTransfer.effectAllowed = "copy";
-                          setDragged(`new:${type}`);
+                          const payload = singleton
+                            ? document.sections.find((s) => s.type === type)!.id
+                            : `new:${type}`;
+                          event.dataTransfer.setData("text/plain", payload);
+                          event.dataTransfer.effectAllowed = singleton
+                            ? "move"
+                            : "copy";
+                          setDragged(payload);
                         }}
                         onClick={() => {
                           if (singleton)
@@ -429,7 +451,7 @@ export function PageBuilder({
                           </strong>
                           <small>
                             {singleton
-                              ? "Already placed · click to edit"
+                              ? `Drag to reorder in ${r} · click to edit`
                               : `Drag to ${r} · click to add`}
                           </small>
                         </span>
@@ -541,21 +563,8 @@ export function PageBuilder({
                         </button>
                         <button
                           aria-label={`Remove ${item.type}`}
-                          disabled={
-                            locked ||
-                            ["Navigation", "Footer"].includes(item.type) ||
-                            (r === "Main" && items.length === 1)
-                          }
-                          onClick={() => {
-                            const sections = document.sections.filter(
-                              (s) => s.id !== item.id,
-                            );
-                            change({ ...document, sections });
-                            setSelected(
-                              sections.find((s) => regionOf(s) === r)?.id ??
-                                sections[0].id,
-                            );
-                          }}
+                          disabled={!canDelete(item.id)}
+                          onClick={() => deleteWidget(item.id)}
                         >
                           ×
                         </button>
@@ -687,6 +696,9 @@ export function PageBuilder({
               selected={selected}
               onDragWidget={setDragged}
               onDropWidget={dropWidget}
+              onDeleteWidget={deleteWidget}
+              canDeleteWidget={canDelete}
+              editorLocked={locked}
               canDropWidget={(r) => {
                 const type = dragged.startsWith("new:")
                   ? (dragged.slice(4) as Section["type"])
@@ -839,9 +851,17 @@ export function PageBuilder({
                         ))}
                     </fieldset>
                   )}
+                  <button
+                    className="secondary delete-widget"
+                    disabled={!canDelete(section.id)}
+                    onClick={() => deleteWidget(section.id)}
+                  >
+                    Delete widget
+                  </button>
                   <p className="helper">
-                    Navigation stays in Header. Footer stays in Footer. Changes
-                    appear in your shop after Publish.
+                    Navigation stays in Header. Footer stays in Footer. Keep at
+                    least one Main widget. Changes appear in your shop after
+                    Publish.
                   </p>
                 </>
               ) : (

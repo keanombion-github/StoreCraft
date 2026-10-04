@@ -56,7 +56,7 @@ public static partial class PageRules
             if (section.Title is null || section.Title.Length > 150 || section.Text is null || section.Text.Length > 1000 || section.Button is null || section.Button.Length > 50 || section.Image is null || section.Image.Length > 1000) return "A widget field is missing or too long.";
             if (section.Image.Length > 0 && (!Uri.TryCreate(section.Image, UriKind.Absolute, out var uri) || uri.Scheme != "https")) return "Widget images must use an HTTPS URL.";
         }
-        if (document.SchemaVersion == 2 && (document.Sections.Count(section => section.Type == "Navigation") != 1 || document.Sections.Count(section => section.Type == "Footer") != 1 || !document.Sections.Any(section => section.Region == "Main"))) return "Keep one navigation, one footer, and at least one main-content widget.";
+        if (document.SchemaVersion == 2 && (document.Sections.Count(section => section.Type == "Navigation") > 1 || document.Sections.Count(section => section.Type == "Footer") > 1 || !document.Sections.Any(section => section.Region == "Main"))) return "Use at most one navigation and one footer, and keep at least one main-content widget.";
         return null;
     }
     public static bool Allowed(string type, string region) => region switch

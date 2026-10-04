@@ -184,6 +184,9 @@ export function PageRenderer({
   onDropWidget,
   onDragWidget,
   canDropWidget,
+  onDeleteWidget,
+  canDeleteWidget,
+  editorLocked = false,
 }: {
   document: PageDocument;
   products: CatalogProduct[];
@@ -200,6 +203,9 @@ export function PageRenderer({
   ) => void;
   onDragWidget?: (id: string) => void;
   canDropWidget?: (region: "Header" | "Main" | "Footer") => boolean;
+  onDeleteWidget?: (id: string) => void;
+  canDeleteWidget?: (id: string) => boolean;
+  editorLocked?: boolean;
 }) {
   const page = normalizePage(document);
   return (
@@ -227,7 +233,9 @@ export function PageRenderer({
               onDragOver={(event) => {
                 event.preventDefault();
                 event.dataTransfer.dropEffect = canDropWidget?.(region)
-                  ? "copy"
+                  ? event.dataTransfer.effectAllowed === "move"
+                    ? "move"
+                    : "copy"
                   : "none";
               }}
               onDrop={(event) => {
@@ -262,7 +270,7 @@ export function PageRenderer({
                     ? (event) => {
                         if (
                           (event.target as HTMLElement).closest(
-                            ".preview-edit,.canvas-drop-slot",
+                            ".preview-edit,.canvas-widget-tools,.canvas-drop-slot",
                           )
                         )
                           return;
@@ -274,17 +282,48 @@ export function PageRenderer({
                 }
               >
                 {onSelect && (
-                  <button
-                    className="preview-edit"
-                    draggable={!!onDragWidget}
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData("text/plain", section.id);
-                      onDragWidget?.(section.id);
-                    }}
-                    onClick={() => onSelect(section.id)}
-                  >
-                    Edit {section.type}
-                  </button>
+                  <div className="canvas-widget-tools">
+                    <button
+                      className="canvas-drag-handle"
+                      draggable={!editorLocked && !!onDragWidget}
+                      disabled={editorLocked}
+                      aria-label={`Drag ${section.type}`}
+                      title={`Drag within ${region}`}
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData("text/plain", section.id);
+                        event.dataTransfer.effectAllowed = "move";
+                        onDragWidget?.(section.id);
+                      }}
+                    >
+                      ⠿ Move
+                    </button>
+                    <button
+                      className="preview-edit"
+                      draggable={!editorLocked && !!onDragWidget}
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData("text/plain", section.id);
+                        onDragWidget?.(section.id);
+                      }}
+                      onClick={() => onSelect(section.id)}
+                    >
+                      Edit {section.type}
+                    </button>
+                    {onDeleteWidget && (
+                      <button
+                        className="canvas-delete"
+                        aria-label={`Delete ${section.type}`}
+                        disabled={!canDeleteWidget?.(section.id)}
+                        title={
+                          canDeleteWidget?.(section.id)
+                            ? "Delete widget"
+                            : "Keep at least one Main widget"
+                        }
+                        onClick={() => onDeleteWidget(section.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 )}
                 {section.type === "Navigation" ? (
                   <header className="widget-store-header">
@@ -362,7 +401,14 @@ export function PageRenderer({
                   <div
                     className={`canvas-drop-slot ${canDropWidget?.(region) ? "accepts-widget" : ""}`}
                     data-drop-region={region}
-                    onDragOver={(event) => event.preventDefault()}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = canDropWidget?.(region)
+                        ? event.dataTransfer.effectAllowed === "move"
+                          ? "move"
+                          : "copy"
+                        : "none";
+                    }}
                     onDrop={(event) => {
                       event.preventDefault();
                       event.stopPropagation();

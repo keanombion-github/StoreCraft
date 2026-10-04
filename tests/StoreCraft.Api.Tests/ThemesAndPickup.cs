@@ -17,6 +17,8 @@ public class ThemesAndPickup
         Assert.Equal("My existing store", upgraded.Sections.Single(s => s.Id == "hero").Title);
         Assert.Equal("Georgia", upgraded.Font);
         Assert.Null(PageRules.Validate(upgraded));
+        Assert.Null(PageRules.Validate(upgraded with { Sections = upgraded.Sections.Where(s => s.Type is not ("Footer" or "Navigation")).ToArray() }));
+        Assert.NotNull(PageRules.Validate(upgraded with { Sections = [.. upgraded.Sections, upgraded.Sections.Single(s => s.Type == "Footer") with { Id = "extra-footer" }] }));
         Assert.NotNull(PageRules.Validate(upgraded with { Sections = upgraded.Sections.Select(s => s.Id == "hero" ? s with { Region = "Header" } : s).ToArray() }));
         Assert.NotNull(PageRules.Validate(upgraded with { ThemeId = "unknown" }));
         Assert.NotNull(PageRules.Validate(upgraded with { Logo = "https://example.com/logo.png", LogoAlt = "" }));

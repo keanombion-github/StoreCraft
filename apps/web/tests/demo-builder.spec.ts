@@ -1,5 +1,68 @@
 import { test, expect } from "@playwright/test";
 
+test("footer can move, be deleted on canvas, and be restored", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Add Announcement to Footer", exact: true })
+    .click();
+  const footer = page.locator(".store-region-footer");
+  await expect(
+    page.getByRole("button", { name: "Add Footer to Footer", exact: true }),
+  ).toHaveAttribute("draggable", "true");
+  const handle = page.getByRole("button", { name: "Drag Footer", exact: true });
+  const slot = footer.locator(".canvas-drop-slot").last();
+  if (testInfo.project.name === "desktop") {
+    await handle.scrollIntoViewIfNeeded();
+    const start = (await handle.boundingBox())!;
+    await page.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2 + 15,
+      { steps: 5 },
+    );
+    await slot.scrollIntoViewIfNeeded();
+    const end = (await slot.boundingBox())!;
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, {
+      steps: 10,
+    });
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2 + 1);
+    await page.mouse.up();
+  } else {
+    const transfer = await page.evaluateHandle(() => new DataTransfer());
+    await handle.dispatchEvent("dragstart", { dataTransfer: transfer });
+    await slot.dispatchEvent("drop", { dataTransfer: transfer });
+  }
+  await expect(footer.locator(".widget-section").last()).toHaveClass(
+    /widget-footer/,
+  );
+  await page
+    .getByRole("button", { name: "Delete Footer", exact: true })
+    .click();
+  await expect(footer.locator(".widget-footer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await expect(page.locator(".store-region-footer .widget-footer")).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Add Footer to Footer", exact: true })
+    .click();
+  await expect(page.locator(".store-region-footer .widget-footer")).toHaveCount(
+    1,
+  );
+  await expect(
+    page.getByRole("complementary", { name: "Widget editor" }),
+  ).toContainText("Footer / Footer");
+});
+
 test("widget library places cards in canvas regions and opens the matching editor", async ({
   page,
 }, testInfo) => {
