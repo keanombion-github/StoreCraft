@@ -138,11 +138,22 @@ test("themes preserve content, regions constrain widgets, drafts and publishing 
   });
   await page.goto("/merchant");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
   await page.getByRole("button", { name: "Edit Hero", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Your original story" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /^Linen/ }).click();
+  await page
+    .getByRole("button", { name: "← Theme library", exact: true })
+    .click();
+  await page
+    .getByRole("article", { name: "Linen theme" })
+    .getByRole("button", { name: "Edit in page builder" })
+    .click();
+  await page.getByRole("button", { name: "Edit Hero", exact: true }).click();
   await expect(page.locator(".theme-linen")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Your original story" }),
@@ -157,15 +168,22 @@ test("themes preserve content, regions constrain widgets, drafts and publishing 
   expect(published.themeId).toBe("midnight");
   expect(draft.themeId).toBe("linen");
   await page
+    .locator(".builder-section > summary")
+    .filter({ hasText: "Page structure" })
+    .click();
+  await page
     .getByRole("button", { name: "Footer", exact: false })
     .filter({ hasText: /^Footer1$/ })
     .click();
-  await expect(page.getByLabel("New widget in Footer")).toHaveValue(
-    "Announcement",
-  );
   await expect(
-    page.getByLabel("New widget in Footer").locator("option"),
-  ).toHaveCount(1);
+    page.getByRole("button", { name: "Add Hero to Footer", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Add Announcement to Footer",
+      exact: true,
+    }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Main", exact: false })
     .filter({ hasText: /^Main2$/ })

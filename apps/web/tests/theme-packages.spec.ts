@@ -10,6 +10,7 @@ test("local theme images are embedded and oversized expanded files are rejected"
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page.locator(".theme-upload-panel > summary").click();
   const files = unzipSync(new Uint8Array(readFileSync(starter)));
   files["atelier/assets/sample.png"] = new Uint8Array(
     Buffer.from(
@@ -20,30 +21,34 @@ test("local theme images are embedded and oversized expanded files are rejected"
   files["atelier/widgets/hero.html"] = strToU8(
     '<h2>{{title}}</h2><img src="{{asset:assets/sample.png}}" alt="Local package image">',
   );
+  await page.getByLabel("Upload theme ZIP").setInputFiles({
+    name: "images.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(zipSync(files)),
+  });
   await page
-    .getByLabel("Upload theme ZIP")
-    .setInputFiles({
-      name: "images.zip",
-      mimeType: "application/zip",
-      buffer: Buffer.from(zipSync(files)),
-    });
+    .getByRole("article", { name: "Atelier theme" })
+    .getByRole("button", { name: "Edit in page builder" })
+    .click();
   const image = page
     .frameLocator('iframe[title="Atelier Hero"]')
     .getByRole("img", { name: "Local package image" });
   await expect(image).toHaveAttribute("src", /^data:image\/png;base64,/);
   await expect(image).toBeVisible();
+  await page.getByRole("button", { name: "← Theme library" }).click();
+  await page.locator(".theme-upload-panel > summary").click();
   files["atelier/assets/large.txt"] = new Uint8Array(600_000);
-  await page
-    .getByLabel("Upload theme ZIP")
-    .setInputFiles({
-      name: "oversized.zip",
-      mimeType: "application/zip",
-      buffer: Buffer.from(zipSync(files)),
-    });
+  await page.getByLabel("Upload theme ZIP").setInputFiles({
+    name: "oversized.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(zipSync(files)),
+  });
   await expect(page.locator('p[role="alert"]')).toContainText(
     "individual file exceeds 500 KB",
   );
-  await expect(page.getByText("Active: Atelier · 1.0.0")).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "Atelier theme" }),
+  ).toBeVisible();
 });
 
 test("uploaded HTML theme retains editable content, publishing and the working bag", async ({
@@ -52,8 +57,15 @@ test("uploaded HTML theme retains editable content, publishing and the working b
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page.locator(".theme-upload-panel > summary").click();
   await page.getByLabel("Upload theme ZIP").setInputFiles(starter);
-  await expect(page.getByText("Active: Atelier · 1.0.0")).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "Atelier theme" }),
+  ).toBeVisible();
+  await page
+    .getByRole("article", { name: "Atelier theme" })
+    .getByRole("button", { name: "Edit in page builder" })
+    .click();
   await expect(
     page
       .frameLocator('iframe[title="Atelier Hero"]')
@@ -75,7 +87,14 @@ test("uploaded HTML theme retains editable content, publishing and the working b
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
-  await expect(page.getByText("Active: Atelier · 1.0.0")).toBeVisible();
+  await page.locator(".theme-upload-panel > summary").click();
+  await expect(
+    page.getByRole("article", { name: "Atelier theme" }),
+  ).toBeVisible();
+  await page
+    .getByRole("article", { name: "Atelier theme" })
+    .getByRole("button", { name: "Edit in page builder" })
+    .click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   const popupPromise = context.waitForEvent("page");
   await page.getByRole("link", { name: "View published" }).click();
@@ -89,7 +108,11 @@ test("uploaded HTML theme retains editable content, publishing and the working b
     .click();
   await popup.getByRole("button", { name: "Bag (1)" }).click();
   await expect(popup.getByRole("dialog")).toContainText("Everyday ceramic mug");
-  await page.getByRole("button", { name: "Remove uploaded theme" }).click();
+  await page.getByRole("button", { name: "← Theme library" }).click();
+  await page
+    .getByRole("article", { name: "Midnight theme" })
+    .getByRole("button", { name: "Edit in page builder" })
+    .click();
   await expect(page.locator("iframe.package-widget-frame")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "<b>A visitor's custom theme</b>" }),
@@ -101,6 +124,7 @@ test("theme import rejects scripts and invalid archive paths without replacing t
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page.locator(".theme-upload-panel > summary").click();
   const files = unzipSync(new Uint8Array(readFileSync(starter)));
   files["atelier/widgets/hero.html"] = strToU8(
     "<script>window.parent.localStorage.clear()</script>",
@@ -122,6 +146,11 @@ test("theme import rejects scripts and invalid archive paths without replacing t
   await expect(page.locator('p[role="alert"]')).toContainText(
     "Invalid archive paths",
   );
+  await page
+    .getByRole("article", { name: "Midnight theme" })
+    .getByRole("button", { name: "Edit in page builder" })
+    .click();
+  await page.locator(".editor-layout-settings > summary").click();
   await expect(
     page.getByRole("heading", {
       name: "Everyday things. A little more considered.",

@@ -14,6 +14,10 @@ public class ThemesAndPickup
     {
         var package = new ThemePackage(1, "Atelier", "1.0.0", "body { color: white; }", new() { ["Hero"] = new("<h2>{{title}}</h2>", 300, ["title"]) });
         Assert.Null(PageRules.Validate(PageRules.Default with { ThemePackage = package }));
+        var entry = new ThemeLibraryEntry("uploaded-fixture", "midnight", "#a78bfa", "Inter", package);
+        Assert.Null(PageRules.Validate(PageRules.Default with { ThemePackage = package, ThemeLibrary = [entry], ThemeKey = entry.Id }));
+        Assert.NotNull(PageRules.Validate(PageRules.Default with { ThemeLibrary = [entry, entry] }));
+        Assert.NotNull(PageRules.Validate(PageRules.Default with { ThemeKey = "missing-theme" }));
         Assert.NotNull(ThemePackageRules.Validate(package with { Css = "@import 'https://example.com/theme.css';" }));
         Assert.NotNull(ThemePackageRules.Validate(package with { Widgets = new() { ["Hero"] = new("<script>alert(1)</script>", 300, ["title"]) } }));
         Assert.NotNull(ThemePackageRules.Validate(package with { Widgets = new() { ["Hero"] = new("<img onerror=alert(1)>", 300, ["title"]) } }));
@@ -54,9 +58,14 @@ public class ThemesAndPickup
             var productResponse = await client.PostAsJsonAsync("/api/merchant/products/", new { title="Fixture",slug="fixture",description="Test item",sku="TEST",priceMinorUnits=2500,stockQuantity=4,status="Active" });
             var id = JsonNode.Parse(await productResponse.Content.ReadAsStringAsync())!["id"]!.GetValue<Guid>();
             var package = new ThemePackage(1, "Fixture theme", "1.0.0", "body { color: white; }", new() { ["Hero"] = new("<h2>{{title}}</h2>", 300, ["title"]) });
-            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish",PageRules.Default with { ThemeId="linen", Font="Georgia", ThemePackage=package })).StatusCode);
+            var themeEntry = new ThemeLibraryEntry("uploaded-fixture", "linen", "#a78bfa", "Georgia", package);
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish",PageRules.Default with { ThemeId="linen", Font="Georgia", ThemePackage=package, ThemeLibrary=[themeEntry], ThemeKey=themeEntry.Id })).StatusCode);
             var publicPage = JsonNode.Parse(await client.GetStringAsync($"/api/public/stores/{slug}"))!;
             Assert.Equal("Fixture theme", publicPage["document"]!["themePackage"]!["name"]!.GetValue<string>());
+            Assert.Null(publicPage["document"]!["themeLibrary"]);
+            var merchantPage = JsonNode.Parse(await client.GetStringAsync("/api/merchant/page"))!;
+            Assert.Equal("uploaded-fixture", merchantPage["publishedDocument"]!["themeKey"]!.GetValue<string>());
+            Assert.Single(merchantPage["document"]!["themeLibrary"]!.AsArray());
             var quote = await client.PostAsJsonAsync($"/api/public/stores/{slug}/quote",new {items=new[]{new { productId=id, quantity=1 }},country="SG",fulfillmentMethod="Pickup"});
             Assert.Equal(0,JsonNode.Parse(await quote.Content.ReadAsStringAsync())!["shipping"]!.GetValue<long>());
             var freeDelivery = await client.PostAsJsonAsync($"/api/public/stores/{slug}/quote",new {items=new[]{new { productId=id, quantity=4 }},country="SG",fulfillmentMethod="Delivery"});

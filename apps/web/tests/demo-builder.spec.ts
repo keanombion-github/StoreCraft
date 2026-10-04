@@ -6,6 +6,10 @@ test("footer can move, be deleted on canvas, and be restored", async ({
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
   await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
+  await page
     .getByRole("button", { name: "Add Announcement to Footer", exact: true })
     .click();
   const footer = page.locator(".store-region-footer");
@@ -49,6 +53,10 @@ test("footer can move, be deleted on canvas, and be restored", async ({
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
   await expect(page.locator(".store-region-footer .widget-footer")).toHaveCount(
     0,
   );
@@ -68,6 +76,10 @@ test("widget library places cards in canvas regions and opens the matching edito
 }, testInfo) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
   await expect(
     page.getByRole("complementary", { name: "Widget editor" }),
   ).toHaveCount(0);
@@ -123,6 +135,10 @@ test("portfolio builder works without auth and publishes only to this browser", 
     page.getByRole("link", { name: "Merchant sign in" }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
   await page.getByRole("button", { name: "Edit Hero", exact: true }).click();
   await page
     .getByLabel("Title", { exact: true })
@@ -130,6 +146,10 @@ test("portfolio builder works without auth and publishes only to this browser", 
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
   await page.getByRole("button", { name: "Edit Hero", exact: true }).click();
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "A portfolio visitor's design",

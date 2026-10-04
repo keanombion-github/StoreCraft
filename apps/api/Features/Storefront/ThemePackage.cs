@@ -5,6 +5,7 @@ namespace StoreCraft.Api.Features.Storefront;
 
 public sealed record ThemeWidget(string Html, int Height, string[] Fields);
 public sealed record ThemePackage(int FormatVersion, string Name, string Version, string Css, Dictionary<string, ThemeWidget> Widgets);
+public sealed record ThemeLibraryEntry(string Id, string ThemeId, string Accent, string Font, ThemePackage ThemePackage);
 
 public static class ThemePackageRules
 {

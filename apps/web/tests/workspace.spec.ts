@@ -92,6 +92,10 @@ test("settings, navigation, failed payment handling and responsive layout", asyn
     page.getByRole("heading", { name: "Overview dashboard" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit in page builder", exact: true })
+    .first()
+    .click();
   await expect(
     page.getByRole("heading", {
       name: "Everyday things. A little more considered.",

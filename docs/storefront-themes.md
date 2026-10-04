@@ -2,6 +2,8 @@
 
 HTML/CSS theme ZIP uploads are now supported. Start with **Download starter theme** in Page builder; see [the theme package guide](theme-packages.md) for the file format, source folder, and editing instructions.
 
+Page builder now starts in **Your themes**. Preview designs in new tabs, open a theme's editor, or use Set active to publish it. Uploaded themes remain in the library when switching designs. Editing and previewing leave the currently published theme unchanged.
+
 For the portfolio demo, open http://localhost:3000/ and select **Page builder**. No login is required. Products, settings, draft designs, and published designs are stored in that visitor's browser. Publish updates their sample storefront at `/s/sunday-supply`, opened in a new tab. Demo images are stored locally (up to 1 MB each); browser storage limits apply. The sample bag is a preview and does not create orders.
 
 Preview the designs at http://localhost:3000/themes. The separate http://localhost:3000/merchant route still requires login for database-backed stores, uploads, orders, and test checkout. Authentication and ownership checks remain enforced on the API.

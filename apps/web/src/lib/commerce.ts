@@ -48,6 +48,8 @@ export type Section = {
   productIds?: string[];
 };
 export type PageDocument = {
+  themeLibrary?: ThemeLibraryEntry[];
+  themeKey?: string;
   themePackage?: ThemePackage | null;
   schemaVersion: number;
   accent: string;
@@ -57,6 +59,13 @@ export type PageDocument = {
   templateId?: "essentials" | "editorial";
   logo?: string;
   logoAlt?: string;
+};
+export type ThemeLibraryEntry = {
+  id: string;
+  themeId: "midnight" | "linen";
+  accent: string;
+  font: string;
+  themePackage: ThemePackage;
 };
 export type ThemePackage = {
   formatVersion: number;

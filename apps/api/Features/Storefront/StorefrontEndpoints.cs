@@ -27,7 +27,9 @@ public static class StorefrontEndpoints
         merchant.MapGet("/page", async (ClaimsPrincipal user, CommerceDbContext db) =>
         {
             var store = await OwnedStore(db, user);
-            return store is null ? Results.NotFound() : Results.Ok(new { document = store.DraftDocument is null ? PageRules.Default : PageRules.Normalize(JsonSerializer.Deserialize<PageDocument>(store.DraftDocument, PageRules.Json)!), published = store.PublishedVersionId.HasValue });
+            if (store is null) return Results.NotFound();
+            var published = store.PublishedVersionId is { } publishedId ? await db.PublishedPages.SingleOrDefaultAsync(page => page.Id == publishedId && page.StoreId == store.Id) : null;
+            return Results.Ok(new { document = store.DraftDocument is null ? PageRules.Default : PageRules.Normalize(JsonSerializer.Deserialize<PageDocument>(store.DraftDocument, PageRules.Json)!), published = store.PublishedVersionId.HasValue, publishedDocument = published is null ? null : PageRules.Normalize(JsonSerializer.Deserialize<PageDocument>(published.Document, PageRules.Json)!) });
         });
         merchant.MapPut("/page", async (PageDocument document, ClaimsPrincipal user, CommerceDbContext db) =>
         {
@@ -56,7 +58,7 @@ public static class StorefrontEndpoints
             if (store is null) return Results.NotFound(new { error = "This store is not published." });
             var page = await db.PublishedPages.AsNoTracking().SingleAsync(page => page.Id == store.PublishedVersionId && page.StoreId == store.Id);
             var products = await db.Products.AsNoTracking().Where(product => product.StoreId == store.Id && product.Status == ProductStatus.Active).OrderBy(product => product.CreatedAt).Select(product => new { product.Id, product.Title, product.Slug, product.Description, product.PriceMinorUnits, product.StockQuantity, product.ImagePath, product.ImageAlt }).ToListAsync();
-            return Results.Ok(new { store = new { store.Name, store.Slug, store.ContactEmail, store.Currency, store.ShippingMinorUnits, store.FreeShippingThreshold, store.PickupEnabled, PickupAddress = store.PickupEnabled ? store.PickupAddress : "" }, document = PageRules.Normalize(JsonSerializer.Deserialize<PageDocument>(page.Document, PageRules.Json)!), products, demoCheckoutEnabled = app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Demo:Enabled") });
+            return Results.Ok(new { store = new { store.Name, store.Slug, store.ContactEmail, store.Currency, store.ShippingMinorUnits, store.FreeShippingThreshold, store.PickupEnabled, PickupAddress = store.PickupEnabled ? store.PickupAddress : "" }, document = PageRules.Normalize(JsonSerializer.Deserialize<PageDocument>(page.Document, PageRules.Json)!) with { ThemeLibrary = null }, products, demoCheckoutEnabled = app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Demo:Enabled") });
         });
     }
     public static Task<Store?> OwnedStore(CommerceDbContext db, ClaimsPrincipal user) => db.Stores.SingleOrDefaultAsync(store => store.OwnerUserId == StoreEndpoints.Owner(user));

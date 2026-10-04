@@ -19,7 +19,8 @@ import {
 import { ImageUpload } from "./image-upload";
 import { PageRenderer } from "./storefront-renderer";
 import { readDemoPage } from "@/lib/demo-page";
-import { ThemePackageUpload } from "./theme-package-upload";
+import { ThemeLibraryView } from "./theme-library-view";
+import { chooseTheme, libraryEntries, themeKey } from "@/lib/theme-library";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeading,
@@ -45,9 +46,10 @@ export function PageBuilder({
   demo?: boolean;
 }) {
   const [document, setDocument] = useState<PageDocument | null>(null);
+  const [screen, setScreen] = useState<"library" | "editor">("library");
+  const [published, setPublished] = useState<PageDocument | null>(null);
   const [selected, setSelected] = useState("");
   const [region, setRegion] = useState<Region>("Main");
-  const [widget, setWidget] = useState<Section["type"]>("Hero");
   const [dragged, setDragged] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -65,13 +67,20 @@ export function PageBuilder({
     let active = true;
     void (
       demo
-        ? Promise.resolve({ document: readDemoPage() })
-        : request<{ document: PageDocument }>("/api/merchant/page")
+        ? Promise.resolve({
+            document: readDemoPage(),
+            publishedDocument: readDemoPage(true),
+          })
+        : request<{
+            document: PageDocument;
+            publishedDocument?: PageDocument | null;
+          }>("/api/merchant/page")
     )
       .then((page) => {
         if (!active) return;
         const normalized = normalizePage(page.document);
         setDocument(normalized);
+        setPublished(page.publishedDocument ?? null);
         setSelected("");
       })
       .catch((failure) => {
@@ -88,7 +97,7 @@ export function PageBuilder({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, uploading]);
   function change(value: PageDocument) {
-    setDocument(value);
+    setDocument({ ...value, themeLibrary: libraryEntries(value) });
     setDirty(true);
     onDirtyChange?.(true);
     setMessage("");
@@ -98,23 +107,29 @@ export function PageBuilder({
     const section = document?.sections.find((s) => s.id === id);
     if (section) setRegion(regionOf(section));
   }
-  async function save(publish: boolean) {
-    if (!document || uploading || busy) return;
+  async function save(
+    publish: boolean,
+    value = document,
+    importComplete = false,
+  ) {
+    if (!value || (!importComplete && uploading) || busy) return;
     setBusy(true);
     setError("");
     try {
       if (demo) {
-        localStorage.setItem("storecraft-demo-draft", JSON.stringify(document));
+        localStorage.setItem("storecraft-demo-draft", JSON.stringify(value));
         if (publish)
           localStorage.setItem(
             "storecraft-demo-published",
-            JSON.stringify(document),
+            JSON.stringify(value),
           );
       } else
         await request(
           publish ? "/api/merchant/page/publish" : "/api/merchant/page",
-          { method: publish ? "POST" : "PUT", body: JSON.stringify(document) },
+          { method: publish ? "POST" : "PUT", body: JSON.stringify(value) },
         );
+      setDocument(value);
+      if (publish) setPublished(value);
       setDirty(false);
       onDirtyChange?.(false);
       setMessage(
@@ -267,9 +282,90 @@ export function PageBuilder({
         addWidget(type, targetRegion, beforeId);
     } else reorder(payload, beforeId, targetRegion);
   }
+  if (screen === "library")
+    return (
+      <>
+        {error && (
+          <p className="alert" role="alert">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="success" role="status">
+            {message}
+          </p>
+        )}
+        <ThemeLibraryView
+          document={document}
+          published={published}
+          locked={locked}
+          slug={store.slug}
+          onBusy={setUploading}
+          onUpload={(value) => {
+            change(value);
+            void save(false, value, true);
+          }}
+          onEdit={(id) => {
+            const next = chooseTheme(document, id);
+            if (id !== themeKey(document)) change(next);
+            else setDocument(next);
+            setScreen("editor");
+            setSelected("");
+          }}
+          onActivate={(id) => {
+            const next = chooseTheme(document, id);
+            change(next);
+            void save(true, next);
+          }}
+          onPreview={(id) => {
+            try {
+              const keys = Object.keys(localStorage).filter((key) =>
+                key.startsWith("storecraft-theme-preview:"),
+              );
+              if (keys.length >= 8) localStorage.removeItem(keys[0]);
+              const idForPreview = crypto.randomUUID();
+              localStorage.setItem(
+                `storecraft-theme-preview:${idForPreview}`,
+                JSON.stringify({
+                  document: {
+                    ...chooseTheme(document, id),
+                    themeLibrary: undefined,
+                  },
+                  products: products.filter(
+                    (product) => product.status === "Active",
+                  ),
+                  storeName: store.name,
+                  expires: Date.now() + 86400000,
+                }),
+              );
+              window.open(
+                `/theme-preview/${idForPreview}`,
+                "_blank",
+                "noopener,noreferrer",
+              );
+            } catch {
+              setError(
+                "The preview could not be saved. Browser storage may be full or disabled.",
+              );
+            }
+          }}
+        />
+      </>
+    );
   return (
     <>
       <div className="builder-toolbar">
+        <button
+          className="secondary"
+          disabled={locked}
+          onClick={() => setScreen("library")}
+        >
+          ← Theme library
+        </button>
+        <span className="editor-theme-name">
+          {document.themePackage?.name ??
+            themes[document.themeId ?? "midnight"].name}
+        </span>
         <span role="status">
           {busy
             ? "Saving…"
@@ -316,47 +412,8 @@ export function PageBuilder({
         </p>
       )}
       <fieldset className="builder-fieldset" disabled={locked}>
-        <div className="theme-library panel">
-          <div>
-            <span className="store-eyebrow">Your storefront</span>
-            <h2>Choose a theme</h2>
-            <p className="muted">
-              Change the design while keeping your content.
-            </p>
-          </div>
-          <div className="theme-options">
-            {(Object.keys(themes) as (keyof typeof themes)[]).map((id) => (
-              <button
-                key={id}
-                className={`theme-option theme-swatch-${id} ${!document.themePackage && document.themeId === id ? "active" : ""}`}
-                disabled={uploading}
-                aria-pressed={!document.themePackage && document.themeId === id}
-                onClick={() =>
-                  change({
-                    ...document,
-                    themeId: id,
-                    themePackage: null,
-                    accent: themes[id].accent,
-                    font: themes[id].font,
-                  })
-                }
-              >
-                <span className="theme-swatch">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <strong>{themes[id].name}</strong>
-                <small>{themes[id].description}</small>
-              </button>
-            ))}
-          </div>
-          <ThemePackageUpload
-            document={document}
-            onChange={change}
-            onBusy={setUploading}
-            locked={locked}
-          />
+        <details className="panel editor-layout-settings">
+          <summary>Starting layout</summary>
           <div className="template-picker">
             <label>
               Starting layout
@@ -395,7 +452,7 @@ export function PageBuilder({
             </button>
             <small>Applying a layout replaces draft widgets.</small>
           </div>
-        </div>
+        </details>
         <div
           className={`builder-layout ${section ? "has-inspector" : ""}`}
           onDragEnd={() => setDragged("")}
@@ -473,224 +530,183 @@ export function PageBuilder({
                 </div>
               ))}
             </div>
-            <h2>Page regions</h2>
-            <p className="helper">
-              Drag widgets within a region, or use the arrow buttons.
-            </p>
-            {regions.map((r) => {
-              const items = document.sections.filter(
-                (item) => regionOf(item) === r,
-              );
-              return (
-                <div
-                  className={`region-list ${region === r ? "active-region" : ""}`}
-                  key={r}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (!locked)
-                      dropWidget(event.dataTransfer.getData("text/plain"), r);
-                  }}
-                >
-                  <button
-                    className="region-heading"
-                    onClick={() => {
-                      setRegion(r);
-                      setWidget(r === "Main" ? "Hero" : "Announcement");
+            <details className="builder-section">
+              <summary>Page structure</summary>
+              <p className="helper">
+                Drag widgets within a region, or use the arrow buttons.
+              </p>
+              {regions.map((r) => {
+                const items = document.sections.filter(
+                  (item) => regionOf(item) === r,
+                );
+                return (
+                  <div
+                    className={`region-list ${region === r ? "active-region" : ""}`}
+                    key={r}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (!locked)
+                        dropWidget(event.dataTransfer.getData("text/plain"), r);
                     }}
-                    aria-pressed={region === r}
                   >
-                    {r}
-                    <span>{items.length}</span>
-                  </button>
-                  {items.map((item, index) => (
-                    <div
-                      className={`widget-list ${item.id === selected ? "selected-widget" : ""}`}
-                      key={item.id}
-                      draggable={!locked}
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData("text/plain", item.id);
-                        event.dataTransfer.effectAllowed = "move";
-                        setDragged(item.id);
+                    <button
+                      className="region-heading"
+                      onClick={() => {
+                        setRegion(r);
                       }}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if (!locked)
-                          dropWidget(
-                            event.dataTransfer.getData("text/plain"),
-                            r,
-                            item.id,
-                          );
-                      }}
+                      aria-pressed={region === r}
                     >
-                      <button
-                        className="text-link widget-select"
-                        onClick={() => select(item.id)}
-                      >
-                        {item.type}
-                        <small>{item.title || "Store branding"}</small>
-                      </button>
-                      <div className="widget-actions">
-                        <button
-                          aria-label={`Move ${item.type} up`}
-                          disabled={locked || index === 0}
-                          onClick={() =>
-                            reorder(item.id, items[index - 1].id, r)
-                          }
-                        >
-                          ↑
-                        </button>
-                        <button
-                          aria-label={`Move ${item.type} down`}
-                          disabled={locked || index === items.length - 1}
-                          onClick={() =>
-                            reorder(items[index + 1].id, item.id, r)
-                          }
-                        >
-                          ↓
-                        </button>
-                        <button
-                          aria-label={`Duplicate ${item.type}`}
-                          disabled={
-                            locked ||
-                            document.sections.length >= 24 ||
-                            ["Navigation", "Footer"].includes(item.type)
-                          }
-                          onClick={() => {
-                            const copy = { ...item, id: crypto.randomUUID() };
-                            const sections = [...document.sections];
-                            sections.splice(
-                              sections.findIndex((s) => s.id === item.id) + 1,
-                              0,
-                              copy,
+                      {r}
+                      <span>{items.length}</span>
+                    </button>
+                    {items.map((item, index) => (
+                      <div
+                        className={`widget-list ${item.id === selected ? "selected-widget" : ""}`}
+                        key={item.id}
+                        draggable={!locked}
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData("text/plain", item.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          setDragged(item.id);
+                        }}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          if (!locked)
+                            dropWidget(
+                              event.dataTransfer.getData("text/plain"),
+                              r,
+                              item.id,
                             );
-                            change({ ...document, sections });
-                            select(item.id);
-                            setSelected(copy.id);
-                          }}
-                        >
-                          ⧉
-                        </button>
+                        }}
+                      >
                         <button
-                          aria-label={`Remove ${item.type}`}
-                          disabled={!canDelete(item.id)}
-                          onClick={() => deleteWidget(item.id)}
+                          className="text-link widget-select"
+                          onClick={() => select(item.id)}
                         >
-                          ×
+                          {item.type}
+                          <small>{item.title || "Store branding"}</small>
                         </button>
+                        <div className="widget-actions">
+                          <button
+                            aria-label={`Move ${item.type} up`}
+                            disabled={locked || index === 0}
+                            onClick={() =>
+                              reorder(item.id, items[index - 1].id, r)
+                            }
+                          >
+                            ↑
+                          </button>
+                          <button
+                            aria-label={`Move ${item.type} down`}
+                            disabled={locked || index === items.length - 1}
+                            onClick={() =>
+                              reorder(items[index + 1].id, item.id, r)
+                            }
+                          >
+                            ↓
+                          </button>
+                          <button
+                            aria-label={`Duplicate ${item.type}`}
+                            disabled={
+                              locked ||
+                              document.sections.length >= 24 ||
+                              ["Navigation", "Footer"].includes(item.type)
+                            }
+                            onClick={() => {
+                              const copy = { ...item, id: crypto.randomUUID() };
+                              const sections = [...document.sections];
+                              sections.splice(
+                                sections.findIndex((s) => s.id === item.id) + 1,
+                                0,
+                                copy,
+                              );
+                              change({ ...document, sections });
+                              select(item.id);
+                              setSelected(copy.id);
+                            }}
+                          >
+                            ⧉
+                          </button>
+                          <button
+                            aria-label={`Remove ${item.type}`}
+                            disabled={!canDelete(item.id)}
+                            onClick={() => deleteWidget(item.id)}
+                          >
+                            ×
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {items.length === 0 && (
-                    <p className="helper">Drop a suitable widget here.</p>
-                  )}
-                </div>
-              );
-            })}
-            <label>
-              New widget in {region}
-              <select
-                value={
-                  widgets[region].includes(widget) &&
-                  !["Navigation", "Footer"].includes(widget)
-                    ? widget
-                    : "Announcement"
-                }
-                onChange={(event) =>
-                  setWidget(event.target.value as Section["type"])
-                }
-              >
-                {widgets[region]
-                  .filter((type) => !["Navigation", "Footer"].includes(type))
-                  .map((type) => (
-                    <option key={type}>{type}</option>
-                  ))}
-              </select>
-            </label>
-            <button
-              className="secondary"
-              disabled={locked || document.sections.length >= 24}
-              onClick={() => {
-                const type =
-                  widgets[region].includes(widget) &&
-                  !["Navigation", "Footer"].includes(widget)
-                    ? widget
-                    : "Announcement";
-                const item: Section = {
-                  id: crypto.randomUUID(),
-                  type,
-                  region,
-                  title: "New section",
-                  text: "",
-                  image: "",
-                  button: "",
-                };
-                change({ ...document, sections: [...document.sections, item] });
-                setSelected(item.id);
-              }}
-            >
-              Add widget
-            </button>
-            <h2>Brand settings</h2>
-            <label>
-              Accent color
-              <input
-                type="color"
-                value={document.accent}
-                onChange={(event) =>
-                  change({ ...document, accent: event.target.value })
+                    ))}
+                    {items.length === 0 && (
+                      <p className="helper">Drop a suitable widget here.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </details>
+            <details className="builder-section">
+              <summary>Brand settings</summary>
+              <label>
+                Accent color
+                <input
+                  type="color"
+                  value={document.accent}
+                  onChange={(event) =>
+                    change({ ...document, accent: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Font
+                <select
+                  value={document.font}
+                  onChange={(event) =>
+                    change({ ...document, font: event.target.value })
+                  }
+                >
+                  <option>Inter</option>
+                  <option>Georgia</option>
+                </select>
+              </label>
+              <ImageUpload
+                localOnly={demo}
+                label="Upload store logo"
+                value={document.logo ?? ""}
+                onBusy={(value) => {
+                  setUploading(value);
+                  onDirtyChange?.(value || dirty);
+                }}
+                onChange={(_path, url) =>
+                  change({
+                    ...document,
+                    logo: url,
+                    logoAlt: document.logoAlt || store.name,
+                  })
                 }
               />
-            </label>
-            <label>
-              Font
-              <select
-                value={document.font}
-                onChange={(event) =>
-                  change({ ...document, font: event.target.value })
-                }
-              >
-                <option>Inter</option>
-                <option>Georgia</option>
-              </select>
-            </label>
-            <ImageUpload
-              localOnly={demo}
-              label="Upload store logo"
-              value={document.logo ?? ""}
-              onBusy={(value) => {
-                setUploading(value);
-                onDirtyChange?.(value || dirty);
-              }}
-              onChange={(_path, url) =>
-                change({
-                  ...document,
-                  logo: url,
-                  logoAlt: document.logoAlt || store.name,
-                })
-              }
-            />
-            <label>
-              Logo alternative text
-              <input
-                value={document.logoAlt ?? ""}
-                maxLength={150}
-                onChange={(event) =>
-                  change({ ...document, logoAlt: event.target.value })
-                }
-              />
-            </label>
-            {document.logo && (
-              <button
-                className="quiet"
-                disabled={uploading}
-                onClick={() => change({ ...document, logo: "", logoAlt: "" })}
-              >
-                Use store name instead
-              </button>
-            )}
+              <label>
+                Logo alternative text
+                <input
+                  value={document.logoAlt ?? ""}
+                  maxLength={150}
+                  onChange={(event) =>
+                    change({ ...document, logoAlt: event.target.value })
+                  }
+                />
+              </label>
+              {document.logo && (
+                <button
+                  className="quiet"
+                  disabled={uploading}
+                  onClick={() => change({ ...document, logo: "", logoAlt: "" })}
+                >
+                  Use store name instead
+                </button>
+              )}
+            </details>
           </aside>
           <div
             className={

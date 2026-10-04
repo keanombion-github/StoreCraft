@@ -1,6 +1,10 @@
 # Uploadable StoreCraft themes
 
-Open the demo, choose **Page builder**, and use **Download starter theme**. Extract the ZIP, edit the files, ZIP the theme folder again, and choose **Upload theme ZIP**. Importing changes the draft's appearance while preserving products, widgets, content, and logo. Save draft to keep it; Publish updates the storefront in a new tab. Pick Midnight or Linen, or Remove uploaded theme, to return to the built-in renderer without losing content.
+Open the demo and choose **Page builder** to start in **Your themes**. Each card offers **Edit in page builder**, **Preview storefront**, and **Set active**. The Current active badge comes from the published snapshot. Preview opens a separate browser tab without publishing; editing changes the draft. Set active publishes the selected theme with the current page content.
+
+Expand **Upload a new theme** to download the starter or import a ZIP. Uploads are saved to the draft library automatically and leave the active storefront unchanged. Extract the starter ZIP, edit its HTML/CSS, ZIP the folder again, and upload it. Uploaded themes remain in the library when switching away. Matching name/version uploads replace that library entry; different versions get separate entries. The library holds five uploaded themes, up to 2 MB combined. The portfolio library stays in the visitor's browser; merchant libraries persist in PostgreSQL. Unpublished library packages are omitted from public storefront responses.
+
+The editor has a back button to the library. Widget cards stay on the left, the canvas sits in the center, and selecting a placed widget opens its inspector. Page structure, branding, and starting-layout controls are expandable to keep the workspace focused.
 
 The working source is `themes/atelier/`. The downloadable archive is `apps/web/public/theme-packages/atelier.zip`. After changing the source, run `node scripts/bundle-theme.cjs` from the project root to rebuild the download.
 

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { importTheme } from "@/lib/theme-packages";
 import type { PageDocument } from "@/lib/commerce";
+import { libraryEntries } from "@/lib/theme-library";
 
 export function ThemePackageUpload({
   document,
@@ -32,8 +33,36 @@ export function ThemePackageUpload({
             onBusy(true);
             try {
               const imported = await importTheme(file);
+              const library = libraryEntries(document);
+              const existing = library.find(
+                (entry) =>
+                  entry.themePackage.name === imported.theme.name &&
+                  entry.themePackage.version === imported.theme.version,
+              );
+              if (!existing && library.length >= 5)
+                throw new Error(
+                  "Your library can hold up to five uploaded themes.",
+                );
+              const id = existing?.id ?? crypto.randomUUID();
+              const entry = {
+                id,
+                themeId: imported.baseTheme,
+                accent: imported.accent,
+                font: imported.font,
+                themePackage: imported.theme,
+              };
+              const nextLibrary = [
+                ...library.filter((item) => item.id !== id),
+                entry,
+              ];
+              if (JSON.stringify(nextLibrary).length > 2_000_000)
+                throw new Error(
+                  "The combined theme library must fit within 2 MB.",
+                );
               onChange({
                 ...document,
+                themeKey: id,
+                themeLibrary: nextLibrary,
                 themePackage: imported.theme,
                 themeId: imported.baseTheme,
                 accent: imported.accent,
@@ -50,21 +79,6 @@ export function ThemePackageUpload({
       <a className="secondary" href="/theme-packages/atelier.zip" download>
         Download starter theme
       </a>
-      {document.themePackage && (
-        <>
-          <span>
-            Active: {document.themePackage.name} ·{" "}
-            {document.themePackage.version}
-          </span>
-          <button
-            className="quiet"
-            disabled={locked}
-            onClick={() => onChange({ ...document, themePackage: null })}
-          >
-            Remove uploaded theme
-          </button>
-        </>
-      )}
       <small>
         Theme files change presentation. Products, widgets, and checkout stay
         connected.
