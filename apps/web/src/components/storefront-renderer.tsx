@@ -5,6 +5,7 @@ import type { CatalogProduct, PageDocument, Section } from "@/lib/commerce";
 import { normalizePage, regionOf, regions } from "@/lib/storefront-themes";
 import { money } from "@/lib/demo-data";
 import { assetUrl } from "./image-upload";
+import { themeWidgetHtml } from "@/lib/theme-packages";
 
 function ProductImage({ product }: { product: CatalogProduct }) {
   const url = product.imagePath
@@ -210,7 +211,7 @@ export function PageRenderer({
   const page = normalizePage(document);
   return (
     <div
-      className={`widget-page theme-${page.themeId ?? "midnight"} template-${page.templateId ?? "essentials"}`}
+      className={`widget-page theme-${page.themeId ?? "midnight"} template-${page.templateId ?? "essentials"} ${page.themePackage ? "has-package" : ""}`}
       style={
         {
           "--page-accent": page.accent,
@@ -325,7 +326,34 @@ export function PageRenderer({
                     )}
                   </div>
                 )}
-                {section.type === "Navigation" ? (
+                {page.themePackage?.widgets[section.type] ? (
+                  <>
+                    <iframe
+                      className="package-widget-frame"
+                      title={`${page.themePackage.name} ${section.type}`}
+                      sandbox=""
+                      referrerPolicy="no-referrer"
+                      style={{
+                        height: page.themePackage.widgets[section.type]!.height,
+                      }}
+                      srcDoc={themeWidgetHtml(page, section, storeName)}
+                    />
+                    {section.type === "FeaturedProducts" && (
+                      <Collection
+                        section={{ ...section, title: "", text: "" }}
+                        products={products}
+                        onAdd={onAdd}
+                      />
+                    )}
+                    {["Navigation", "Hero", "ImageText", "Footer"].includes(
+                      section.type,
+                    ) && (
+                      <a className="widget-button" href={catalogHref}>
+                        {section.button || "Explore the collection"}
+                      </a>
+                    )}
+                  </>
+                ) : section.type === "Navigation" ? (
                   <header className="widget-store-header">
                     <a
                       href={

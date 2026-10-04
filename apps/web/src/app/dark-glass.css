@@ -1810,6 +1810,14 @@ td {
 .canvas-widget-tools .canvas-drag-handle:active { cursor: grabbing; }
 .canvas-widget-tools .canvas-delete, .delete-widget { color: #ffc5ce; border-color: #b87888; }
 .canvas-widget-tools button:disabled { opacity: .45; cursor: not-allowed; }
+.workspace select { color-scheme: dark; background-color: #17121f; color: #f4edf9; }
+.workspace select option, .workspace select optgroup { background-color: #21182b; color: #f4edf9; }
+.theme-package-controls { grid-column: 1 / -1; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 16px 0; border-top: 1px solid #ffffff20; }
+.theme-package-controls label { color: #e9dcfa; font-size: 13px; }
+.theme-package-controls input { max-width: 250px; color: #f4edf9; }
+.package-widget-frame { display: block; width: 100%; border: 0; grid-column: 1 / -1; background: var(--store-bg); }
+.builder-preview .package-widget-frame { pointer-events: none; }
+.widget-page.has-package .widget-hero, .widget-page.has-package .widget-imagetext { grid-template-columns: 1fr; gap: 12px; }
 .region-list .widget-select { color: #f2e9ff; }
 @media (max-width: 1200px) { .builder-layout, .builder-layout.has-inspector { grid-template-columns: 230px minmax(0, 1fr); } .widget-inspector { grid-column: 1 / -1; position: static; max-height: none; } }
 @media (max-width: 700px) { .builder-layout, .builder-layout.has-inspector { grid-template-columns: minmax(0, 1fr); } .widget-inspector { grid-column: auto; } .widget-library { grid-template-columns: repeat(2, minmax(0, 1fr)); } .widget-library-card { padding: 10px; } .widget-library-card svg { width: 16px; } }

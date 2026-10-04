@@ -1,0 +1,17 @@
+{
+  "formatVersion": 1,
+  "name": "Atelier",
+  "version": "1.0.0",
+  "baseTheme": "midnight",
+  "accent": "#c5a47e",
+  "font": "Georgia",
+  "stylesheet": "assets/theme.css",
+  "widgets": {
+    "Navigation": { "region": "Header", "template": "widgets/navigation.html", "height": 90, "fields": ["text", "button"] },
+    "Announcement": { "region": "Header", "template": "widgets/announcement.html", "height": 80, "fields": ["title", "text"] },
+    "Hero": { "region": "Main", "template": "widgets/hero.html", "height": 500, "fields": ["title", "text", "image", "button"] },
+    "ImageText": { "region": "Main", "template": "widgets/image-text.html", "height": 460, "fields": ["title", "text", "image", "button"] },
+    "FeaturedProducts": { "region": "Main", "template": "widgets/products.html", "height": 130, "fields": ["title", "text"] },
+    "Footer": { "region": "Footer", "template": "widgets/footer.html", "height": 180, "fields": ["title", "text"] }
+  }
+}

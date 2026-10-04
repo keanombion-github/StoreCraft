@@ -10,6 +10,16 @@ using StoreCraft.Api.Features.Storefront;
 public class ThemesAndPickup
 {
     [Fact]
+    public void UploadedThemesValidatePresentationFilesAndRejectExecutableContent()
+    {
+        var package = new ThemePackage(1, "Atelier", "1.0.0", "body { color: white; }", new() { ["Hero"] = new("<h2>{{title}}</h2>", 300, ["title"]) });
+        Assert.Null(PageRules.Validate(PageRules.Default with { ThemePackage = package }));
+        Assert.NotNull(ThemePackageRules.Validate(package with { Css = "@import 'https://example.com/theme.css';" }));
+        Assert.NotNull(ThemePackageRules.Validate(package with { Widgets = new() { ["Hero"] = new("<script>alert(1)</script>", 300, ["title"]) } }));
+        Assert.NotNull(ThemePackageRules.Validate(package with { Widgets = new() { ["Hero"] = new("<img onerror=alert(1)>", 300, ["title"]) } }));
+        Assert.NotNull(ThemePackageRules.Validate(package with { Widgets = new() { ["Hero"] = new("<h2>{{title}}</h2>", 9000, ["unknown"]) } }));
+    }
+    [Fact]
     public void LegacyPagesKeepContentAndRegionRulesRejectInvalidLayouts()
     {
         var legacy = new PageDocument(1, "#956ec6", "Georgia", [new("hero", "Hero", "My existing store", "Keep this", "", "Shop"), new("footer", "Footer", "My footer", "", "", "")]);
@@ -43,7 +53,10 @@ public class ThemesAndPickup
             Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/merchant/store",new { name="Pickup test",contactEmail="test@example.com",shippingMinorUnits=500,freeShippingThreshold=10000,pickupEnabled=true,pickupAddress="Test collection point" })).StatusCode);
             var productResponse = await client.PostAsJsonAsync("/api/merchant/products/", new { title="Fixture",slug="fixture",description="Test item",sku="TEST",priceMinorUnits=2500,stockQuantity=4,status="Active" });
             var id = JsonNode.Parse(await productResponse.Content.ReadAsStringAsync())!["id"]!.GetValue<Guid>();
-            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish",PageRules.Default with { ThemeId="linen", Font="Georgia" })).StatusCode);
+            var package = new ThemePackage(1, "Fixture theme", "1.0.0", "body { color: white; }", new() { ["Hero"] = new("<h2>{{title}}</h2>", 300, ["title"]) });
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish",PageRules.Default with { ThemeId="linen", Font="Georgia", ThemePackage=package })).StatusCode);
+            var publicPage = JsonNode.Parse(await client.GetStringAsync($"/api/public/stores/{slug}"))!;
+            Assert.Equal("Fixture theme", publicPage["document"]!["themePackage"]!["name"]!.GetValue<string>());
             var quote = await client.PostAsJsonAsync($"/api/public/stores/{slug}/quote",new {items=new[]{new { productId=id, quantity=1 }},country="SG",fulfillmentMethod="Pickup"});
             Assert.Equal(0,JsonNode.Parse(await quote.Content.ReadAsStringAsync())!["shipping"]!.GetValue<long>());
             var freeDelivery = await client.PostAsJsonAsync($"/api/public/stores/{slug}/quote",new {items=new[]{new { productId=id, quantity=4 }},country="SG",fulfillmentMethod="Delivery"});

@@ -19,6 +19,7 @@ import {
 import { ImageUpload } from "./image-upload";
 import { PageRenderer } from "./storefront-renderer";
 import { readDemoPage } from "@/lib/demo-page";
+import { ThemePackageUpload } from "./theme-package-upload";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeading,
@@ -160,6 +161,10 @@ export function PageBuilder({
       </div>
     );
   const section = document.sections.find((item) => item.id === selected);
+  const editable = (field: string) =>
+    !section ||
+    !document.themePackage?.widgets[section.type] ||
+    document.themePackage.widgets[section.type]!.fields.includes(field);
   const locked = busy || uploading;
   function update(values: Partial<Section>) {
     change({
@@ -323,13 +328,14 @@ export function PageBuilder({
             {(Object.keys(themes) as (keyof typeof themes)[]).map((id) => (
               <button
                 key={id}
-                className={`theme-option theme-swatch-${id} ${document.themeId === id ? "active" : ""}`}
+                className={`theme-option theme-swatch-${id} ${!document.themePackage && document.themeId === id ? "active" : ""}`}
                 disabled={uploading}
-                aria-pressed={document.themeId === id}
+                aria-pressed={!document.themePackage && document.themeId === id}
                 onClick={() =>
                   change({
                     ...document,
                     themeId: id,
+                    themePackage: null,
                     accent: themes[id].accent,
                     font: themes[id].font,
                   })
@@ -345,6 +351,12 @@ export function PageBuilder({
               </button>
             ))}
           </div>
+          <ThemePackageUpload
+            document={document}
+            onChange={change}
+            onBusy={setUploading}
+            locked={locked}
+          />
           <div className="template-picker">
             <label>
               Starting layout
@@ -727,63 +739,72 @@ export function PageBuilder({
                   <p className="widget-location">
                     {regionOf(section)} / {section.type}
                   </p>
-                  <label>
-                    Title
-                    <input
-                      value={section.title}
-                      maxLength={150}
-                      onChange={(event) =>
-                        update({ title: event.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Text
-                    <textarea
-                      value={section.text}
-                      maxLength={1000}
-                      rows={5}
-                      onChange={(event) => update({ text: event.target.value })}
-                    />
-                  </label>
-                  {["Hero", "ImageText"].includes(section.type) && (
-                    <>
-                      <ImageUpload
-                        localOnly={demo}
-                        value={section.image}
-                        onBusy={(value) => {
-                          setUploading(value);
-                          onDirtyChange?.(value || dirty);
-                        }}
-                        onChange={(_path, url) => update({ image: url })}
-                      />
-                      <label>
-                        Image URL (HTTPS)
-                        <input
-                          type="url"
-                          value={section.image}
-                          maxLength={1000}
-                          onChange={(event) =>
-                            update({ image: event.target.value })
-                          }
-                        />
-                      </label>
-                    </>
-                  )}
-                  {["Hero", "ImageText", "Navigation"].includes(
-                    section.type,
-                  ) && (
+                  {editable("title") && (
                     <label>
-                      Button label
+                      Title
                       <input
-                        value={section.button}
-                        maxLength={50}
+                        value={section.title}
+                        maxLength={150}
                         onChange={(event) =>
-                          update({ button: event.target.value })
+                          update({ title: event.target.value })
                         }
                       />
                     </label>
                   )}
+                  {editable("text") && (
+                    <label>
+                      Text
+                      <textarea
+                        aria-label="Text"
+                        value={section.text}
+                        maxLength={1000}
+                        rows={5}
+                        onChange={(event) =>
+                          update({ text: event.target.value })
+                        }
+                      />
+                    </label>
+                  )}
+                  {editable("image") &&
+                    ["Hero", "ImageText"].includes(section.type) && (
+                      <>
+                        <ImageUpload
+                          localOnly={demo}
+                          value={section.image}
+                          onBusy={(value) => {
+                            setUploading(value);
+                            onDirtyChange?.(value || dirty);
+                          }}
+                          onChange={(_path, url) => update({ image: url })}
+                        />
+                        <label>
+                          Image URL (HTTPS)
+                          <input
+                            type="url"
+                            value={section.image}
+                            maxLength={1000}
+                            onChange={(event) =>
+                              update({ image: event.target.value })
+                            }
+                          />
+                        </label>
+                      </>
+                    )}
+                  {editable("button") &&
+                    ["Hero", "ImageText", "Navigation"].includes(
+                      section.type,
+                    ) && (
+                      <label>
+                        Button label
+                        <input
+                          value={section.button}
+                          maxLength={50}
+                          onChange={(event) =>
+                            update({ button: event.target.value })
+                          }
+                        />
+                      </label>
+                    )}
                   {section.type === "FeaturedProducts" && (
                     <fieldset className="featured-product-picker">
                       <legend>Featured products</legend>

@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace StoreCraft.Api.Features.Storefront;
 
 public sealed record PageSection(string Id, string Type, string Title, string Text, string Image, string Button, string Region = "Main", Guid[]? ProductIds = null);
-public sealed record PageDocument(int SchemaVersion, string Accent, string Font, PageSection[] Sections, string ThemeId = "midnight", string TemplateId = "essentials", string Logo = "", string LogoAlt = "");
+public sealed record PageDocument(int SchemaVersion, string Accent, string Font, PageSection[] Sections, string ThemeId = "midnight", string TemplateId = "essentials", string Logo = "", string LogoAlt = "", ThemePackage? ThemePackage = null);
 public sealed class PublishedPage
 {
     public Guid Id { get; set; }
@@ -42,6 +42,7 @@ public static partial class PageRules
 
     public static string? Validate(PageDocument document)
     {
+        if (document.ThemePackage is { } package && ThemePackageRules.Validate(package) is { } packageError) return packageError;
         if (document.SchemaVersion is not (1 or 2) || !AccentPattern().IsMatch(document.Accent ?? "") || document.Font is not ("Inter" or "Georgia")) return "Choose a supported page version, font, and six-digit hex color.";
         if (document.ThemeId is not ("midnight" or "linen") || document.TemplateId is not ("essentials" or "editorial")) return "Choose an available theme and template.";
         if (document.Logo is null || document.LogoAlt is null || document.LogoAlt.Length > 150 || document.Logo.Length > 1000 || (document.Logo.Length > 0 && (!Uri.TryCreate(document.Logo, UriKind.Absolute, out var logo) || logo.Scheme != "https" || string.IsNullOrWhiteSpace(document.LogoAlt)))) return "Provide an HTTPS logo and descriptive alternative text.";

@@ -48,6 +48,7 @@ export type Section = {
   productIds?: string[];
 };
 export type PageDocument = {
+  themePackage?: ThemePackage | null;
   schemaVersion: number;
   accent: string;
   font: string;
@@ -56,6 +57,15 @@ export type PageDocument = {
   templateId?: "essentials" | "editorial";
   logo?: string;
   logoAlt?: string;
+};
+export type ThemePackage = {
+  formatVersion: number;
+  name: string;
+  version: string;
+  css: string;
+  widgets: Partial<
+    Record<Section["type"], { html: string; height: number; fields: string[] }>
+  >;
 };
 export type LiveOrder = {
   id: string;

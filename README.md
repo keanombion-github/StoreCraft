@@ -8,6 +8,8 @@ A persistent workspace at `/merchant` now connects Supabase Auth, the .NET API, 
 
 The builder now offers Midnight/Linen themes, Essentials/Editorial layouts, Header/Main/Footer regions, image/logo uploads, featured product selection, and drag/keyboard reordering. The public catalog supports search, pagination, and product details. Checkout supports delivery and free pickup, with API quotes and an order-event queue for a future OMS. Preview at `/themes`; read [the theme walkthrough](docs/storefront-themes.md) and [deployment setup](docs/deployment.md).
 
+Page builder also imports StoreCraft HTML/CSS theme ZIPs. Download the Atelier starter in the builder, or edit its source in [themes/atelier](themes/atelier). Read [the package guide](docs/theme-packages.md) for file structure, bindings, editable fields, validation, and current limits. The portfolio demo and its builder work without login.
+
 See [docs/milestone-2-foundation.md](docs/milestone-2-foundation.md) for the API walkthrough and Supabase setup step. View store now opens the sample storefront in a new tab at `/s/sunday-supply`.
 
 The full scope and learning checkpoints are in [PROJECT_BRIEF.md](PROJECT_BRIEF.md).
