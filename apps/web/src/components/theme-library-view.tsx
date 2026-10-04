@@ -2,6 +2,8 @@
 import type { PageDocument } from "@/lib/commerce";
 import { libraryEntries, themeKey } from "@/lib/theme-library";
 import { themes } from "@/lib/storefront-themes";
+import { downloadTheme } from "@/lib/theme-download";
+import { chooseTheme } from "@/lib/theme-library";
 import { ThemePackageUpload } from "./theme-package-upload";
 
 export function ThemeLibraryView({
@@ -63,89 +65,120 @@ export function ThemeLibraryView({
           </a>
         )}
       </header>
-      <div className="theme-manager-grid">
-        {cards.map((card) => {
-          const active = !!published && themeKey(published) === card.id;
-          return (
-            <article
-              key={card.id}
-              className={`theme-manager-card ${active ? "is-active" : ""}`}
-              aria-label={`${card.name} theme`}
-            >
-              <div
-                className={`theme-card-preview ${card.light ? "light-preview" : ""}`}
-                style={
-                  { "--theme-card-accent": card.accent } as React.CSSProperties
-                }
-              >
-                <div className="theme-card-header">
-                  <span>StoreCraft</span>
-                  <i />
-                </div>
-                <div className="theme-card-hero">
-                  <span>A considered collection.</span>
-                  <i />
-                </div>
-                <div className="theme-card-products">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </div>
-              <div className="theme-card-info">
-                <div>
-                  <h3>{card.name}</h3>
-                  {active ? (
-                    <span className="theme-active-badge">Current active</span>
-                  ) : (
-                    <span className="theme-available-badge">Available</span>
-                  )}
-                </div>
-                <p>{card.description}</p>
-                {themeKey(document) === card.id && !active && (
-                  <small>Selected draft</small>
-                )}
-              </div>
-              <div className="theme-card-actions">
-                <button
-                  className="primary"
-                  disabled={locked}
-                  onClick={() => onEdit(card.id)}
-                >
-                  Edit in page builder
-                </button>
-                <button
-                  className="secondary"
-                  disabled={locked}
-                  onClick={() => onPreview(card.id)}
-                >
-                  Preview storefront ↗
-                </button>
-                <button
-                  className="quiet"
-                  disabled={locked || active}
-                  onClick={() => onActivate(card.id)}
-                >
-                  {active ? "Active theme" : "Set active"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      <details className="panel theme-upload-panel">
-        <summary>Upload a new theme</summary>
-        <p>
-          Add a StoreCraft theme ZIP to your library. Uploading doesn’t change
-          the live storefront.
-        </p>
+      <section className="theme-active-section" aria-label="Active theme">
+        <h3>Active theme</h3>
+        {!published && (
+          <p>
+            No active theme yet. Choose a theme below to publish your
+            storefront.
+          </p>
+        )}
+        <div className="theme-active-grid">
+          {renderCards(
+            cards.filter(
+              (card) => published && themeKey(published) === card.id,
+            ),
+          )}
+        </div>
+      </section>
+      <section
+        className="theme-available-section"
+        aria-label="Available themes"
+      >
+        <h3>Theme library</h3>
+        <p>Try another design or upload your own theme.</p>
         <ThemePackageUpload
           document={document}
           onChange={onUpload}
           onBusy={onBusy}
           locked={locked}
         />
-      </details>
+        <div className="theme-manager-grid">
+          {renderCards(
+            cards.filter(
+              (card) => !published || themeKey(published) !== card.id,
+            ),
+          )}
+        </div>
+      </section>
     </section>
   );
+
+  function renderCards(items: typeof cards) {
+    return items.map((card) => {
+      const active = !!published && themeKey(published) === card.id;
+      return (
+        <article
+          key={card.id}
+          className={`theme-manager-card ${active ? "is-active" : ""}`}
+          aria-label={`${card.name} theme`}
+        >
+          <div
+            className={`theme-card-preview ${card.light ? "light-preview" : ""}`}
+            style={
+              { "--theme-card-accent": card.accent } as React.CSSProperties
+            }
+          >
+            <div className="theme-card-header">
+              <span>StoreCraft</span>
+              <i />
+            </div>
+            <div className="theme-card-hero">
+              <span>A considered collection.</span>
+              <i />
+            </div>
+            <div className="theme-card-products">
+              <i />
+              <i />
+              <i />
+            </div>
+          </div>
+          <div className="theme-card-info">
+            <div>
+              <h3>{card.name}</h3>
+              {active ? (
+                <span className="theme-active-badge">Current active</span>
+              ) : (
+                <span className="theme-available-badge">Available</span>
+              )}
+            </div>
+            <p>{card.description}</p>
+            {themeKey(document) === card.id && !active && (
+              <small>Selected draft</small>
+            )}
+          </div>
+          <div className="theme-card-actions">
+            <button
+              className="primary"
+              disabled={locked}
+              onClick={() => onEdit(card.id)}
+            >
+              Edit in page builder
+            </button>
+            <button
+              className="secondary"
+              disabled={locked}
+              onClick={() => onPreview(card.id)}
+            >
+              Preview storefront ↗
+            </button>
+            <button
+              className="quiet"
+              disabled={locked || active}
+              onClick={() => onActivate(card.id)}
+            >
+              {active ? "Active theme" : "Set active"}
+            </button>
+            <button
+              className="quiet"
+              disabled={locked}
+              onClick={() => downloadTheme(chooseTheme(document, card.id))}
+            >
+              Download theme
+            </button>
+          </div>
+        </article>
+      );
+    });
+  }
 }

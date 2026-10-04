@@ -18,8 +18,8 @@ export function ThemePackageUpload({
   const [error, setError] = useState("");
   return (
     <div className="theme-package-controls">
-      <label>
-        Upload a StoreCraft theme ZIP
+      <label className="theme-upload-button primary">
+        Upload a new theme
         <input
           aria-label="Upload theme ZIP"
           type="file"
@@ -76,12 +76,8 @@ export function ThemePackageUpload({
           }}
         />
       </label>
-      <a className="secondary" href="/theme-packages/atelier.zip" download>
-        Download starter theme
-      </a>
       <small>
-        Theme files change presentation. Products, widgets, and checkout stay
-        connected.
+        StoreCraft ZIP � Up to 2 MB. Uploading keeps your live theme unchanged.
       </small>
       {error && (
         <p className="alert" role="alert">

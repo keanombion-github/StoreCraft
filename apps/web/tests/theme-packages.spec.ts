@@ -10,7 +10,6 @@ test("local theme images are embedded and oversized expanded files are rejected"
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
-  await page.locator(".theme-upload-panel > summary").click();
   const files = unzipSync(new Uint8Array(readFileSync(starter)));
   files["atelier/assets/sample.png"] = new Uint8Array(
     Buffer.from(
@@ -36,7 +35,6 @@ test("local theme images are embedded and oversized expanded files are rejected"
   await expect(image).toHaveAttribute("src", /^data:image\/png;base64,/);
   await expect(image).toBeVisible();
   await page.getByRole("button", { name: "← Theme library" }).click();
-  await page.locator(".theme-upload-panel > summary").click();
   files["atelier/assets/large.txt"] = new Uint8Array(600_000);
   await page.getByLabel("Upload theme ZIP").setInputFiles({
     name: "oversized.zip",
@@ -57,7 +55,6 @@ test("uploaded HTML theme retains editable content, publishing and the working b
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
-  await page.locator(".theme-upload-panel > summary").click();
   await page.getByLabel("Upload theme ZIP").setInputFiles(starter);
   await expect(
     page.getByRole("article", { name: "Atelier theme" }),
@@ -87,7 +84,6 @@ test("uploaded HTML theme retains editable content, publishing and the working b
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await page.reload();
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
-  await page.locator(".theme-upload-panel > summary").click();
   await expect(
     page.getByRole("article", { name: "Atelier theme" }),
   ).toBeVisible();
@@ -124,7 +120,6 @@ test("theme import rejects scripts and invalid archive paths without replacing t
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
-  await page.locator(".theme-upload-panel > summary").click();
   const files = unzipSync(new Uint8Array(readFileSync(starter)));
   files["atelier/widgets/hero.html"] = strToU8(
     "<script>window.parent.localStorage.clear()</script>",

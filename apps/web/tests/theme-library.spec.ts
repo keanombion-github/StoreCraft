@@ -34,7 +34,6 @@ test("theme library separates previews, edits, uploads and the active storefront
   await expect(
     page.getByRole("article", { name: "Linen theme" }),
   ).toContainText("Current active");
-  await page.locator(".theme-upload-panel > summary").click();
   await page
     .getByLabel("Upload theme ZIP")
     .setInputFiles(path.resolve("public/theme-packages/atelier.zip"));
@@ -57,3 +56,23 @@ test("theme library separates previews, edits, uploads and the active storefront
   await expect(atelier).toBeVisible();
   await expect(midnight).toContainText("Current active");
 });
+
+test("theme cards download an uploadable ZIP and keep the active theme in its own row", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await expect(page.locator(".theme-active-grid article")).toHaveCount(1);
+  await expect(page.locator(".theme-manager-grid .is-active")).toHaveCount(0);
+  await expect(page.locator(".theme-upload-button")).toBeVisible();
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("article", { name: "Linen theme" }).getByRole("button", { name: "Download theme", exact: true }).click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toBe("linen.zip");
+  const target = testInfo.outputPath("linen.zip");
+  await download.saveAs(target);
+  await page.getByLabel("Upload theme ZIP").setInputFiles(target);
+  await expect(page.locator(".theme-manager-grid article")).toHaveCount(2);
+  await expect(page.locator(".theme-package-controls").getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".theme-active-grid article")).toContainText("Midnight");
+  await page.screenshot({ path: testInfo.outputPath("theme-library-layout.png"), fullPage: true });
+});
+
