@@ -181,6 +181,9 @@ export function PageRenderer({
   onAdd,
   onSelect,
   selected,
+  onDropWidget,
+  onDragWidget,
+  canDropWidget,
 }: {
   document: PageDocument;
   products: CatalogProduct[];
@@ -190,6 +193,13 @@ export function PageRenderer({
   onAdd?: (product: CatalogProduct) => void;
   onSelect?: (id: string) => void;
   selected?: string;
+  onDropWidget?: (
+    payload: string,
+    region: "Header" | "Main" | "Footer",
+    beforeId: string,
+  ) => void;
+  onDragWidget?: (id: string) => void;
+  canDropWidget?: (region: "Header" | "Main" | "Footer") => boolean;
 }) {
   const page = normalizePage(document);
   return (
@@ -210,6 +220,28 @@ export function PageRenderer({
           data-region={region}
         >
           {onSelect && <div className="preview-region-label">{region}</div>}
+          {onDropWidget && (
+            <div
+              className={`canvas-drop-slot ${canDropWidget?.(region) ? "accepts-widget" : ""}`}
+              data-drop-region={region}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = canDropWidget?.(region)
+                  ? "copy"
+                  : "none";
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                onDropWidget(
+                  event.dataTransfer.getData("text/plain"),
+                  region,
+                  page.sections.find((s) => regionOf(s) === region)?.id ?? "",
+                );
+              }}
+            >
+              Drop a widget in {region}
+            </div>
+          )}
           {page.sections
             .filter((section) => regionOf(section) === region)
             .map((section) => (
@@ -225,10 +257,30 @@ export function PageRenderer({
                     : undefined
                 }
                 className={`widget-section widget-${section.type.toLowerCase()} ${selected === section.id && onSelect ? "preview-selected" : ""}`}
+                onClickCapture={
+                  onSelect
+                    ? (event) => {
+                        if (
+                          (event.target as HTMLElement).closest(
+                            ".preview-edit,.canvas-drop-slot",
+                          )
+                        )
+                          return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onSelect(section.id);
+                      }
+                    : undefined
+                }
               >
                 {onSelect && (
                   <button
                     className="preview-edit"
+                    draggable={!!onDragWidget}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("text/plain", section.id);
+                      onDragWidget?.(section.id);
+                    }}
                     onClick={() => onSelect(section.id)}
                   >
                     Edit {section.type}
@@ -304,6 +356,28 @@ export function PageRenderer({
                   <div className="store-announcement">
                     <strong>{section.title}</strong>
                     {section.text && <span>{section.text}</span>}
+                  </div>
+                )}
+                {onDropWidget && (
+                  <div
+                    className={`canvas-drop-slot ${canDropWidget?.(region) ? "accepts-widget" : ""}`}
+                    data-drop-region={region}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const list = page.sections.filter(
+                        (s) => regionOf(s) === region,
+                      );
+                      onDropWidget(
+                        event.dataTransfer.getData("text/plain"),
+                        region,
+                        list[list.findIndex((s) => s.id === section.id) + 1]
+                          ?.id ?? "",
+                      );
+                    }}
+                  >
+                    Drop widget here
                   </div>
                 )}
               </section>

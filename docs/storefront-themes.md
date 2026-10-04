@@ -18,6 +18,8 @@ Preview the designs at http://localhost:3000/themes. The separate http://localho
 
 Navigation and Footer cannot be duplicated or removed. Main must retain at least one widget. Drag to reorder compatible widgets, or use keyboard-accessible arrow buttons. The API validates these rules independently of the editor.
 
+The left widget library groups cards by region. Drag a card into a dashed space in the canvas; compatible spaces highlight in purple. On touch screens, tap a library card to add it to its listed region. Select a placed widget or its Edit button to open the right inspector, which offers fields appropriate to that widget. Close the inspector to expand the canvas. Drag the Edit handle to move a placed widget, or use the arrows in Page regions.
+
 The document is schema version 2. Older version 1 drafts/snapshots load through a compatibility adapter; their saved JSON is not rewritten just by viewing them. Saving and publishing remain separate. The same renderer powers the editor, shop, catalog, and theme gallery.
 
 ## How to try the complete flow

@@ -138,6 +138,7 @@ test("themes preserve content, regions constrain widgets, drafts and publishing 
   });
   await page.goto("/merchant");
   await page.getByRole("button", { name: "Page builder", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Hero", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Your original story" }),
   ).toBeVisible();
@@ -311,20 +312,39 @@ test("product images reject unsupported files and save an owned upload with alt 
   expect(uploads).toBe(1);
 });
 
-test("the full catalog includes products outside the home selection and paginates", async ({ page }) => {
-  const products = Array.from({ length: 10 }, (_, index) => ({ ...product, id: `11111111-1111-1111-1111-${String(index + 1).padStart(12, "0")}`, title: `Studio piece ${index + 1}` }));
-  const document = { ...initialDocument, sections: initialDocument.sections.map(section => section.type === "FeaturedProducts" ? { ...section, productIds: [products[0].id] } : section) };
-  await page.route("http://localhost:5050/api/public/**", route => route.fulfill({ json: { store, document, products } }));
+test("the full catalog includes products outside the home selection and paginates", async ({
+  page,
+}) => {
+  const products = Array.from({ length: 10 }, (_, index) => ({
+    ...product,
+    id: `11111111-1111-1111-1111-${String(index + 1).padStart(12, "0")}`,
+    title: `Studio piece ${index + 1}`,
+  }));
+  const document = {
+    ...initialDocument,
+    sections: initialDocument.sections.map((section) =>
+      section.type === "FeaturedProducts"
+        ? { ...section, productIds: [products[0].id] }
+        : section,
+    ),
+  };
+  await page.route("http://localhost:5050/api/public/**", (route) =>
+    route.fulfill({ json: { store, document, products } }),
+  );
   await page.goto("/s/test-studio");
   await expect(page.locator(".shop-product")).toHaveCount(1);
   await page.getByRole("link", { name: "Collection", exact: true }).click();
   await expect(page).toHaveURL(/\/s\/test-studio\/catalog$/);
-  await expect(page.getByRole("heading", { name: "The full collection" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "The full collection" }),
+  ).toBeVisible();
   await expect(page.locator(".shop-product")).toHaveCount(8);
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.locator(".shop-product")).toHaveCount(2);
   await expect(page.getByText("Page 2 of 2")).toBeVisible();
   await page.getByLabel("Search this collection").fill("Studio piece 9");
   await expect(page.locator(".shop-product")).toHaveCount(1);
-  await expect(page.getByRole("heading", { name: "Studio piece 9" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Studio piece 9" }),
+  ).toBeVisible();
 });

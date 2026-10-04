@@ -19,6 +19,15 @@ import {
 import { ImageUpload } from "./image-upload";
 import { PageRenderer } from "./storefront-renderer";
 import { readDemoPage } from "@/lib/demo-page";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHeading,
+  faImages,
+  faBullhorn,
+  faBox,
+  faBars,
+  faGripLines,
+} from "@fortawesome/free-solid-svg-icons";
 export { PageRenderer } from "./storefront-renderer";
 
 export function PageBuilder({
@@ -38,6 +47,7 @@ export function PageBuilder({
   const [selected, setSelected] = useState("");
   const [region, setRegion] = useState<Region>("Main");
   const [widget, setWidget] = useState<Section["type"]>("Hero");
+  const [dragged, setDragged] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -61,9 +71,7 @@ export function PageBuilder({
         if (!active) return;
         const normalized = normalizePage(page.document);
         setDocument(normalized);
-        setSelected(
-          normalized.sections.find((s) => regionOf(s) === "Main")?.id ?? "",
-        );
+        setSelected("");
       })
       .catch((failure) => {
         if (active) setError(failure.message);
@@ -187,6 +195,53 @@ export function PageBuilder({
     setRegion(targetRegion);
     setSelected(id);
   }
+  function addWidget(
+    type: Section["type"],
+    targetRegion: Region,
+    beforeId = "",
+  ) {
+    if (locked) return;
+    if (!widgets[targetRegion].includes(type)) {
+      setError(`${type} cannot go in ${targetRegion}.`);
+      return;
+    }
+    if (document!.sections.length >= 24) {
+      setError("A page can have up to 24 widgets.");
+      return;
+    }
+    if (
+      ["Navigation", "Footer"].includes(type) &&
+      document!.sections.some((s) => s.type === type)
+    ) {
+      setError(`Your page already has a ${type} widget. Select it to edit it.`);
+      return;
+    }
+    const item: Section = {
+      id: crypto.randomUUID(),
+      type,
+      region: targetRegion,
+      title: "New section",
+      text: "",
+      image: "",
+      button: "",
+    };
+    const sections = [...document!.sections];
+    const index = sections.findIndex((s) => s.id === beforeId);
+    sections.splice(index < 0 ? sections.length : index, 0, item);
+    change({ ...document!, sections });
+    setSelected(item.id);
+    setRegion(targetRegion);
+    setError("");
+  }
+  function dropWidget(payload: string, targetRegion: Region, beforeId = "") {
+    setDragged("");
+    if (locked) return;
+    if (payload.startsWith("new:")) {
+      const type = payload.slice(4) as Section["type"];
+      if (regions.some((r) => widgets[r].includes(type)))
+        addWidget(type, targetRegion, beforeId);
+    } else reorder(payload, beforeId, targetRegion);
+  }
   return (
     <>
       <div className="builder-toolbar">
@@ -309,8 +364,81 @@ export function PageBuilder({
             <small>Applying a layout replaces draft widgets.</small>
           </div>
         </div>
-        <div className="builder-layout">
+        <div
+          className={`builder-layout ${section ? "has-inspector" : ""}`}
+          onDragEnd={() => setDragged("")}
+        >
           <aside className="panel builder-controls">
+            <h2>Widget library</h2>
+            <p className="helper">
+              Drag a card into a highlighted space. On touch screens, choose a
+              region and tap a card.
+            </p>
+            <div className="widget-library">
+              {regions.map((r) => (
+                <div className="widget-library-group" key={r}>
+                  <h3>{r}</h3>
+                  {widgets[r].map((type) => {
+                    const singleton =
+                      ["Navigation", "Footer"].includes(type) &&
+                      document.sections.some((s) => s.type === type);
+                    const icon =
+                      type === "Hero"
+                        ? faHeading
+                        : type === "ImageText"
+                          ? faImages
+                          : type === "FeaturedProducts"
+                            ? faBox
+                            : type === "Announcement"
+                              ? faBullhorn
+                              : type === "Navigation"
+                                ? faBars
+                                : faGripLines;
+                    return (
+                      <button
+                        key={type}
+                        className="widget-library-card"
+                        draggable={!locked && !singleton}
+                        disabled={locked}
+                        aria-label={`Add ${type} to ${r}`}
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData(
+                            "text/plain",
+                            `new:${type}`,
+                          );
+                          event.dataTransfer.effectAllowed = "copy";
+                          setDragged(`new:${type}`);
+                        }}
+                        onClick={() => {
+                          if (singleton)
+                            select(
+                              document.sections.find((s) => s.type === type)!
+                                .id,
+                            );
+                          else addWidget(type, r);
+                        }}
+                      >
+                        <FontAwesomeIcon icon={icon} />
+                        <span>
+                          <strong>
+                            {type === "FeaturedProducts"
+                              ? "Product collection"
+                              : type === "ImageText"
+                                ? "Image & text"
+                                : type}
+                          </strong>
+                          <small>
+                            {singleton
+                              ? "Already placed · click to edit"
+                              : `Drag to ${r} · click to add`}
+                          </small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
             <h2>Page regions</h2>
             <p className="helper">
               Drag widgets within a region, or use the arrow buttons.
@@ -327,7 +455,7 @@ export function PageBuilder({
                   onDrop={(event) => {
                     event.preventDefault();
                     if (!locked)
-                      reorder(event.dataTransfer.getData("text/plain"), "", r);
+                      dropWidget(event.dataTransfer.getData("text/plain"), r);
                   }}
                 >
                   <button
@@ -349,16 +477,17 @@ export function PageBuilder({
                       onDragStart={(event) => {
                         event.dataTransfer.setData("text/plain", item.id);
                         event.dataTransfer.effectAllowed = "move";
+                        setDragged(item.id);
                       }}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         if (!locked)
-                          reorder(
+                          dropWidget(
                             event.dataTransfer.getData("text/plain"),
-                            item.id,
                             r,
+                            item.id,
                           );
                       }}
                     >
@@ -556,138 +685,170 @@ export function PageBuilder({
               contactEmail={store.contactEmail}
               onSelect={select}
               selected={selected}
+              onDragWidget={setDragged}
+              onDropWidget={dropWidget}
+              canDropWidget={(r) => {
+                const type = dragged.startsWith("new:")
+                  ? (dragged.slice(4) as Section["type"])
+                  : document.sections.find((s) => s.id === dragged)?.type;
+                return !!type && widgets[r].includes(type) && !locked;
+              }}
             />
           </div>
-          <aside className="panel builder-controls">
-            <h2>Widget settings</h2>
-            {section ? (
-              <>
-                <p className="widget-location">
-                  {regionOf(section)} / {section.type}
-                </p>
-                <label>
-                  Title
-                  <input
-                    value={section.title}
-                    maxLength={150}
-                    onChange={(event) => update({ title: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Text
-                  <textarea
-                    value={section.text}
-                    maxLength={1000}
-                    rows={5}
-                    onChange={(event) => update({ text: event.target.value })}
-                  />
-                </label>
-                {["Hero", "ImageText"].includes(section.type) && (
-                  <>
-                    <ImageUpload
-                      localOnly={demo}
-                      value={section.image}
-                      onBusy={(value) => {
-                        setUploading(value);
-                        onDirtyChange?.(value || dirty);
-                      }}
-                      onChange={(_path, url) => update({ image: url })}
-                    />
-                    <label>
-                      Image URL (HTTPS)
-                      <input
-                        type="url"
-                        value={section.image}
-                        maxLength={1000}
-                        onChange={(event) =>
-                          update({ image: event.target.value })
-                        }
-                      />
-                    </label>
-                  </>
-                )}
-                {["Hero", "ImageText", "Navigation"].includes(section.type) && (
+          {section && (
+            <aside
+              className="panel builder-controls widget-inspector"
+              aria-label="Widget editor"
+            >
+              <div className="inspector-heading">
+                <h2>Widget settings</h2>
+                <button
+                  className="quiet"
+                  aria-label="Close widget editor"
+                  onClick={() => setSelected("")}
+                >
+                  ×
+                </button>
+              </div>
+              {section ? (
+                <>
+                  <p className="widget-location">
+                    {regionOf(section)} / {section.type}
+                  </p>
                   <label>
-                    Button label
+                    Title
                     <input
-                      value={section.button}
-                      maxLength={50}
+                      value={section.title}
+                      maxLength={150}
                       onChange={(event) =>
-                        update({ button: event.target.value })
+                        update({ title: event.target.value })
                       }
                     />
                   </label>
-                )}
-                {section.type === "FeaturedProducts" && (
-                  <fieldset className="featured-product-picker">
-                    <legend>Featured products</legend>
-                    <p className="helper">
-                      Leave all unchecked to show the whole active catalog.
-                    </p>
-                    {section.productIds?.some(
-                      (id) =>
-                        !products.some(
-                          (product) =>
-                            product.id === id && product.status === "Active",
-                        ),
-                    ) && (
-                      <div className="info-note">
-                        <p>This collection references unavailable products.</p>
-                        <button
-                          className="secondary"
-                          onClick={() =>
-                            update({
-                              productIds: section.productIds?.filter((id) =>
-                                products.some(
-                                  (product) =>
-                                    product.id === id &&
-                                    product.status === "Active",
-                                ),
-                              ),
-                            })
+                  <label>
+                    Text
+                    <textarea
+                      value={section.text}
+                      maxLength={1000}
+                      rows={5}
+                      onChange={(event) => update({ text: event.target.value })}
+                    />
+                  </label>
+                  {["Hero", "ImageText"].includes(section.type) && (
+                    <>
+                      <ImageUpload
+                        localOnly={demo}
+                        value={section.image}
+                        onBusy={(value) => {
+                          setUploading(value);
+                          onDirtyChange?.(value || dirty);
+                        }}
+                        onChange={(_path, url) => update({ image: url })}
+                      />
+                      <label>
+                        Image URL (HTTPS)
+                        <input
+                          type="url"
+                          value={section.image}
+                          maxLength={1000}
+                          onChange={(event) =>
+                            update({ image: event.target.value })
                           }
-                        >
-                          Remove unavailable selections
-                        </button>
-                      </div>
-                    )}
-                    {products
-                      .filter((p) => p.status === "Active")
-                      .map((product) => (
-                        <label key={product.id}>
-                          <input
-                            type="checkbox"
-                            checked={
-                              section.productIds?.includes(product.id) ?? false
-                            }
-                            disabled={
-                              !section.productIds?.includes(product.id) &&
-                              (section.productIds?.length ?? 0) >= 24
-                            }
-                            onChange={(event) =>
+                        />
+                      </label>
+                    </>
+                  )}
+                  {["Hero", "ImageText", "Navigation"].includes(
+                    section.type,
+                  ) && (
+                    <label>
+                      Button label
+                      <input
+                        value={section.button}
+                        maxLength={50}
+                        onChange={(event) =>
+                          update({ button: event.target.value })
+                        }
+                      />
+                    </label>
+                  )}
+                  {section.type === "FeaturedProducts" && (
+                    <fieldset className="featured-product-picker">
+                      <legend>Featured products</legend>
+                      <p className="helper">
+                        Leave all unchecked to show the whole active catalog.
+                      </p>
+                      {section.productIds?.some(
+                        (id) =>
+                          !products.some(
+                            (product) =>
+                              product.id === id && product.status === "Active",
+                          ),
+                      ) && (
+                        <div className="info-note">
+                          <p>
+                            This collection references unavailable products.
+                          </p>
+                          <button
+                            className="secondary"
+                            onClick={() =>
                               update({
-                                productIds: event.target.checked
-                                  ? [...(section.productIds ?? []), product.id]
-                                  : section.productIds?.filter(
-                                      (id) => id !== product.id,
-                                    ),
+                                productIds: section.productIds?.filter((id) =>
+                                  products.some(
+                                    (product) =>
+                                      product.id === id &&
+                                      product.status === "Active",
+                                  ),
+                                ),
                               })
                             }
-                          />
-                          {product.title}
-                        </label>
-                      ))}
-                  </fieldset>
-                )}
-                <p className="helper">
-                  Navigation stays in Header. Footer stays in Footer. Changes
-                  appear in your shop after Publish.
-                </p>
-              </>
-            ) : (
-              <p>Select a widget to edit it.</p>
-            )}
-          </aside>
+                          >
+                            Remove unavailable selections
+                          </button>
+                        </div>
+                      )}
+                      {products
+                        .filter((p) => p.status === "Active")
+                        .map((product) => (
+                          <label key={product.id}>
+                            <input
+                              type="checkbox"
+                              checked={
+                                section.productIds?.includes(product.id) ??
+                                false
+                              }
+                              disabled={
+                                !section.productIds?.includes(product.id) &&
+                                (section.productIds?.length ?? 0) >= 24
+                              }
+                              onChange={(event) =>
+                                update({
+                                  productIds: event.target.checked
+                                    ? [
+                                        ...(section.productIds ?? []),
+                                        product.id,
+                                      ]
+                                    : section.productIds?.filter(
+                                        (id) => id !== product.id,
+                                      ),
+                                })
+                              }
+                            />
+                            {product.title}
+                          </label>
+                        ))}
+                    </fieldset>
+                  )}
+                  <p className="helper">
+                    Navigation stays in Header. Footer stays in Footer. Changes
+                    appear in your shop after Publish.
+                  </p>
+                </>
+              ) : (
+                <p>Select a widget to edit it.</p>
+              )}
+            </aside>
+          )}
         </div>
       </fieldset>
     </>
