@@ -59,3 +59,6 @@ OMS events use the existing OrderPlaced/FulfillmentUpdated schema. Merchant sync
 Deploy both the API and frontend update, then verify checkout, dashboard reload, and fulfillment. The provider is simulated, not Stripe.
 
 The repository now supplies NEXT_PUBLIC_API_URL=https://storecraft-api.onrender.com in netlify.toml so portfolio checkout reaches the deployed API even when the dashboard value is empty. Update this public setting if the API hostname changes.
+
+
+The portfolio storefront now uses dedicated /s/sunday-supply/cart and /s/sunday-supply/checkout routes. Checkout follows Information → Shipping → Payment → Confirmation, with contact/address validation before advancing. The same simulated-payment API saves orders. Cart contents persist in browser storage; guest details persist in session storage until successful checkout. Checkout starts at Information after reload so incomplete details cannot skip validation. The order summary stays alongside checkout on desktop and collapses above it on mobile. Empty carts cannot checkout. Existing merchant storefront checkout remains separate from these portfolio routes.

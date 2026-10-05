@@ -44,11 +44,16 @@ test("product changes survive reload and active visibility controls storefront",
   });
   await product.getByRole("button", { name: "Add to bag" }).click();
   await page.getByRole("button", { name: "Bag (1)", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("$17.50");
+  await expect(page).toHaveURL(/\/cart$/);
+  await expect(page.locator(".commerce-summary")).toContainText("$12.50");
   await page.getByLabel("Quantity for Learning mug").fill("3");
-  await expect(page.getByRole("dialog")).toContainText("$42.50");
-  await page.getByRole("button", { name: "Remove", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Your bag is waiting");
+  await expect(page.locator(".commerce-summary")).toContainText("$37.50");
+  await page
+    .getByRole("button", { name: "Remove Learning mug", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your cart is empty" }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(errors).toEqual([]);

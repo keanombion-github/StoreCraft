@@ -14,6 +14,7 @@ import {
   type Settings,
 } from "@/lib/demo-data";
 import { ProductEditor, SettingsForm } from "./store-forms";
+import { DemoCommercePage } from "./demo-commerce-page";
 import { Shop } from "./storefront";
 import { OverviewCards } from "./overview-cards";
 import { PageBuilder } from "./page-builder";
@@ -46,8 +47,10 @@ const subscribe = () => () => {};
 
 export function StoreApp({
   storefrontPreview = false,
+  commercePage,
 }: {
   storefrontPreview?: boolean;
+  commercePage?: "cart" | "checkout";
 }) {
   const ready = useSyncExternalStore(
     subscribe,
@@ -55,7 +58,10 @@ export function StoreApp({
     () => false,
   );
   return ready ? (
-    <Workspace storefrontPreview={storefrontPreview} />
+    <Workspace
+      storefrontPreview={storefrontPreview}
+      commercePage={commercePage}
+    />
   ) : (
     <p className="loading">Opening your workspace…</p>
   );
@@ -96,7 +102,13 @@ function readSaved(): { products: Product[]; settings: Settings } {
   return { products: initialProducts, settings: initialSettings };
 }
 
-function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
+function Workspace({
+  storefrontPreview,
+  commercePage,
+}: {
+  storefrontPreview: boolean;
+  commercePage?: "cart" | "checkout";
+}) {
   const router = useRouter();
   const [saved] = useState(readSaved);
   const [products, setProducts] = useState(saved.products);
@@ -152,6 +164,14 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
       (filter === "All products" || p.status === filter),
   );
   const order = orders.find((o) => o.reference === selectedOrder);
+  if (commercePage)
+    return (
+      <DemoCommercePage
+        mode={commercePage}
+        products={active}
+        settings={settings}
+      />
+    );
   if (storefrontPreview)
     return (
       <Shop

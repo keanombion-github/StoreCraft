@@ -103,7 +103,8 @@ test("uploaded HTML theme retains editable content, publishing and the working b
     .first()
     .click();
   await popup.getByRole("button", { name: "Bag (1)" }).click();
-  await expect(popup.getByRole("dialog")).toContainText("Everyday ceramic mug");
+  await expect(popup).toHaveURL(/\/cart$/);
+  await expect(popup.getByRole("heading",{name:"Everyday ceramic mug",exact:true})).toBeVisible();
   await page.getByRole("button", { name: "← Theme library" }).click();
   await page
     .getByRole("article", { name: "Midnight theme" })
