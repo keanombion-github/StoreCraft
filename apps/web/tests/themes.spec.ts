@@ -176,11 +176,11 @@ test("themes preserve content, regions constrain widgets, drafts and publishing 
     .filter({ hasText: /^Footer1$/ })
     .click();
   await expect(
-    page.getByRole("button", { name: "Add Hero to Footer", exact: true }),
-  ).toHaveCount(0);
+    page.getByRole("button", { name: "Add Hero", exact: true }),
+  ).toHaveCount(1);
   await expect(
     page.getByRole("button", {
-      name: "Add Announcement to Footer",
+      name: "Add Announcement",
       exact: true,
     }),
   ).toBeVisible();

@@ -4,8 +4,10 @@ test("new content widgets publish and containers move with children to any regio
   await page.goto("/");
   await page.getByRole("button", {name:"Page builder",exact:true}).click();
   await page.getByRole("button", {name:"Edit in page builder",exact:true}).first().click();
-  await page.getByRole("button", {name:"Add Container to Header",exact:true}).click();
-  await page.getByRole("button", {name:"Add Text to Header",exact:true}).click();
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Header");
+  await page.getByRole("button", {name:"Add Container",exact:true}).click();
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Header");
+  await page.getByRole("button", {name:"Add Text",exact:true}).click();
   const inspector = page.getByRole("complementary", {name:"Widget editor"});
   await inspector.getByLabel("Title", {exact:true}).fill("Text in any region");
   await inspector.getByLabel("Text", {exact:true}).fill("A separate text widget");
@@ -14,11 +16,13 @@ test("new content widgets publish and containers move with children to any regio
   await container.getByRole("button", {name:"Edit Container",exact:true}).click();
   await inspector.getByLabel("Placement", {exact:true}).selectOption("Footer");
   await expect(page.locator(".store-region-footer > .widget-container .widget-text")).toContainText("A separate text widget");
-  await page.getByRole("button", {name:"Add Image to Footer",exact:true}).click();
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Footer");
+  await page.getByRole("button", {name:"Add Image",exact:true}).click();
   await inspector.getByLabel("Image alternative text", {exact:true}).fill("Handmade collection");
   await inspector.getByLabel("Image URL (HTTPS)", {exact:true}).fill("https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=300");
   await expect(page.locator(".widget-container").getByRole("img", {name:"Handmade collection"})).toBeVisible();
-  await page.getByRole("button", {name:"Add Html to Main",exact:true}).click();
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Main");
+  await page.getByRole("button", {name:"Add Html",exact:true}).click();
   await inspector.getByLabel("HTML code").fill('<style>h2{color:purple}</style><article><h2>Custom markup</h2><p>Custom HTML works</p></article>');
   const frame = page.frameLocator('iframe[title="Custom HTML widget"]');
   await expect(frame.getByRole("heading", {name:"Custom markup"})).toBeVisible();

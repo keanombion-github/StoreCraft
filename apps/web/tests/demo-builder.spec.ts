@@ -9,12 +9,13 @@ test("footer can move, be deleted on canvas, and be restored", async ({
     .getByRole("button", { name: "Edit in page builder", exact: true })
     .first()
     .click();
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Footer");
   await page
-    .getByRole("button", { name: "Add Announcement to Footer", exact: true })
+    .getByRole("button", { name: "Add Announcement", exact: true })
     .click();
   const footer = page.locator(".store-region-footer");
   await expect(
-    page.getByRole("button", { name: "Add Footer to Footer", exact: true }),
+    page.getByRole("button", { name: "Add Footer", exact: true }),
   ).toHaveAttribute("draggable", "true");
   const handle = page.getByRole("button", { name: "Drag Footer", exact: true });
   const slot = footer.locator(".canvas-drop-slot").last();
@@ -60,8 +61,9 @@ test("footer can move, be deleted on canvas, and be restored", async ({
   await expect(page.locator(".store-region-footer .widget-footer")).toHaveCount(
     0,
   );
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Footer");
   await page
-    .getByRole("button", { name: "Add Footer to Footer", exact: true })
+    .getByRole("button", { name: "Add Footer", exact: true })
     .click();
   await expect(page.locator(".store-region-footer .widget-footer")).toHaveCount(
     1,
@@ -84,7 +86,7 @@ test("widget library places cards in canvas regions and opens the matching edito
     page.getByRole("complementary", { name: "Widget editor" }),
   ).toHaveCount(0);
   const source = page.getByRole("button", {
-    name: "Add ImageText to Main",
+    name: "Add ImageText",
     exact: true,
   });
   const mainSlot = page.locator('[data-drop-region="Main"]').first();
@@ -113,8 +115,9 @@ test("widget library places cards in canvas regions and opens the matching edito
   await editor.getByRole("button", { name: "Close widget editor" }).click();
   await page.getByRole("heading", { name: "A new image story" }).click();
   await expect(editor.getByLabel("Image URL (HTTPS)")).toBeVisible();
+  await page.getByLabel("Add widgets to", {exact:true}).selectOption("Footer");
   await page
-    .getByRole("button", { name: "Add Announcement to Footer", exact: true })
+    .getByRole("button", { name: "Add Announcement", exact: true })
     .click();
   await expect(editor).toContainText("Footer / Announcement");
   await expect(editor.getByLabel("Image URL (HTTPS)")).toHaveCount(0);

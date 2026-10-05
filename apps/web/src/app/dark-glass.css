@@ -1933,3 +1933,5 @@ td {
 .inspector-heading > button { min-width: 40px; min-height: 40px; }
 .builder-layout > .builder-controls.widget-library-panel { background: #19141f; }
 @media (max-width: 700px) { .builder-layout > .builder-controls.widget-library-panel { max-height: 180px; } }
+.library-placement { margin: 12px 0 16px; }
+@media (max-width: 700px) { .library-collapsed > .library-placement { display: none; } }

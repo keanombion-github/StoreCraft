@@ -644,13 +644,34 @@ export function PageBuilder({
             </div>
             <p className="helper">
               Drag a card into a highlighted space. On touch screens, choose a
-              region and tap a card.
+              placement below and tap a card.
             </p>
+            <label className="library-placement">
+              Add widgets to
+              <select
+                aria-label="Add widgets to"
+                value={region}
+                onChange={(event) => setRegion(event.target.value as Region)}
+              >
+                {regions.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="widget-library">
-              {regions.map((r) => (
-                <div className="widget-library-group" key={r}>
-                  <h3>{r}</h3>
-                  {widgets[r].map((type) => {
+              <div className="widget-library-group">
+                {[...new Set(regions.flatMap((r) => widgets[r]))].map(
+                  (type) => {
+                    const insideContainer =
+                      section?.type === "Container" &&
+                      regionOf(section) === region &&
+                      !["Container", "Navigation", "Footer"].includes(type);
+                    const r =
+                      insideContainer || widgets[region].includes(type)
+                        ? region
+                        : regions.find((r) => widgets[r].includes(type))!;
                     const singleton =
                       ["Navigation", "Footer"].includes(type) &&
                       document.sections.some((s) => s.type === type);
@@ -680,7 +701,7 @@ export function PageBuilder({
                         className="widget-library-card"
                         draggable={!locked}
                         disabled={locked}
-                        aria-label={`Add ${type} to ${r}`}
+                        aria-label={`Add ${type}`}
                         onDragStart={(event) => {
                           const payload = singleton
                             ? document.sections.find((s) => s.type === type)!.id
@@ -701,9 +722,7 @@ export function PageBuilder({
                             addWidget(
                               type,
                               r,
-                              section?.type === "Container" &&
-                                r === regionOf(section) &&
-                                type !== "Container"
+                              insideContainer
                                 ? `column:${section.id}:${Math.min(targetColumn, (section.columns ?? 2) - 1)}`
                                 : "",
                             );
@@ -722,15 +741,15 @@ export function PageBuilder({
                           </strong>
                           <small>
                             {singleton
-                              ? `Drag to reorder in ${r} · click to edit`
-                              : `Drag to ${r} · click to add`}
+                              ? "Drag to reorder · click to edit"
+                              : "Drag to place · click to add"}
                           </small>
                         </span>
                       </button>
                     );
-                  })}
-                </div>
-              ))}
+                  },
+                )}
+              </div>
             </div>
             <details className="builder-section">
               <summary>Page structure</summary>
