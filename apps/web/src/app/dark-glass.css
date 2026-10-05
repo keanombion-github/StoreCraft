@@ -2059,3 +2059,11 @@ td {
   max-height: calc(100dvh - 32px);
   border-radius: 16px;
 }
+
+.demo-checkout-form fieldset { border: 0; padding: 0; margin: 20px 0; min-width: 0; }
+.demo-checkout-form label { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; font-size: 14px; }
+.demo-checkout-form input, .demo-checkout-form select { width: 100%; min-height: 44px; padding: 10px 12px; background: #0d0b12; border: 1px solid #746882; border-radius: 6px; color: #fff; box-sizing: border-box; }
+.checkout-address-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.demo-checkout-result p { line-height: 1.6; }
+.demo-checkout-form > .text-link, .demo-checkout-result > .text-link { display: block; margin: 16px auto 0; text-align: center; }
+@media(max-width: 380px) { .checkout-address-row { grid-template-columns: 1fr; gap: 0; } }

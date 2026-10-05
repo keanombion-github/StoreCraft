@@ -45,3 +45,15 @@ Verify API readiness, merchant login and email confirmation, ownership isolation
 There is no local Docker installation in this workspace. The Docker image build passed in GitHub Actions, alongside API and frontend checks. Live configuration still needs provider account access. Hosting accounts, provider limits, and auth redirect configuration cannot be inferred from source files.
 
 References: [Render Blueprint configuration](https://render.com/docs/blueprint-spec), [Render free services](https://render.com/docs/free), and [Next.js on Netlify](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/).
+
+## Portfolio checkout and future OMS
+
+Sunday Supply now offers checkout from its bag, with Singapore delivery or free pickup and successful/declined simulated payments. No provider keys are needed. Render requires Demo__Enabled=true, already set by the Blueprint.
+
+POST /api/demo/checkout persists orders and transactional OrderEvents using the existing database schema. The dedicated unpublished portfolio demo store separates these from merchant records. API totals use bounded snapshots of the visitor-authored demo catalog and shipping settings. These are saved test orders; they do not charge money or consume merchant inventory. No migration is needed.
+
+The browser retains its own order references and private receipt tokens, and displays them alongside seeded examples in Orders. A token is required to read a receipt or update demo fulfillment. Delivery follows Unfulfilled → Shipped → Delivered; pickup follows Unfulfilled → ReadyForPickup → Collected. Failed payments cannot be fulfilled. Identical checkout retries return the existing order. Clearing browser storage removes dashboard links, not database records. Use fictional guest details.
+
+OMS events use the existing OrderPlaced/FulfillmentUpdated schema. Merchant sync routes remain authenticated and scoped to owned stores; anonymous portfolio records require a separately secured integration before an OMS can consume them. Never expose a global public order list. Plan retention for persisted demo records before sustained traffic; checkout rate limiting is active.
+
+Deploy both the API and frontend update, then verify checkout, dashboard reload, and fulfillment. The provider is simulated, not Stripe.

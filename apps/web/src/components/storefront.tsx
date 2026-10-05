@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { money, photo, type Product, type Settings } from "@/lib/demo-data";
 import type { PageDocument } from "@/lib/commerce";
 import { demoCatalog } from "@/lib/demo-page";
+import { DemoCheckout } from "./demo-checkout";
 import { PageRenderer } from "./storefront-renderer";
 
 export function Shop({
@@ -16,7 +17,32 @@ export function Shop({
   onBack: () => void;
   page?: PageDocument;
 }) {
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const [cart, setCart] = useState<Record<string, number>>(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("storecraft-demo-bag-v1") ?? "{}",
+      );
+      return Object.fromEntries(
+        products
+          .filter(
+            (p) =>
+              Number.isInteger(saved?.[p.id]) && saved[p.id] > 0 && p.stock > 0,
+          )
+          .map((p) => [p.id, Math.min(saved[p.id], p.stock, 99)]),
+      );
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("storecraft-demo-bag-v1", JSON.stringify(cart));
+    } catch {
+      /* Browsing still works without storage. */
+    }
+  }, [cart]);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
@@ -33,7 +59,7 @@ export function Shop({
   function add(p: Product) {
     setCart((current) => ({
       ...current,
-      [p.id]: Math.min(p.stock, (current[p.id] ?? 0) + 1),
+      [p.id]: Math.min(p.stock, 99, (current[p.id] ?? 0) + 1),
     }));
   }
   return (
@@ -165,10 +191,18 @@ export function Shop({
       )}
       {(cartOpen || selected) && (
         <ShopDialog
-          title={selected ? selected.title : "Your bag"}
+          busy={checkoutBusy}
+          title={
+            selected
+              ? selected.title
+              : checkoutOpen
+                ? "Test checkout"
+                : "Your bag"
+          }
           onClose={() => {
             setSelected(null);
             setCartOpen(false);
+            setCheckoutOpen(false);
           }}
         >
           {selected ? (
@@ -196,6 +230,15 @@ export function Shop({
                 Add to bag
               </button>
             </>
+          ) : checkoutOpen ? (
+            <DemoCheckout
+              products={products}
+              cart={cart}
+              settings={settings}
+              onBusyChange={setCheckoutBusy}
+              onPaid={() => setCart({})}
+              onBack={() => setCheckoutOpen(false)}
+            />
           ) : (
             <>
               <h2>
@@ -221,14 +264,14 @@ export function Shop({
                               aria-label={`Quantity for ${p.title}`}
                               type="number"
                               min="1"
-                              max={p.stock}
+                              max={Math.min(p.stock, 99)}
                               value={cart[p.id]}
                               onChange={(e) => {
                                 const n = Number(e.target.value);
                                 if (
                                   Number.isInteger(n) &&
                                   n >= 1 &&
-                                  n <= p.stock
+                                  n <= Math.min(p.stock, 99)
                                 )
                                   setCart({ ...cart, [p.id]: n });
                               }}
@@ -261,8 +304,17 @@ export function Shop({
                 </>
               )}
               <div className="info-note">
-                This is a demo bag. No payment or order is created.
+                Try checkout with simulated payments. Test orders are saved; no
+                money is charged.
               </div>
+              {quantity > 0 && (
+                <button
+                  className="shop-button bag-continue"
+                  onClick={() => setCheckoutOpen(true)}
+                >
+                  Checkout
+                </button>
+              )}
               <button
                 className="shop-button bag-continue"
                 onClick={() => setCartOpen(false)}
@@ -279,10 +331,12 @@ export function Shop({
 
 function ShopDialog({
   title,
+  busy = false,
   onClose,
   children,
 }: {
   title: string;
+  busy?: boolean;
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -304,9 +358,12 @@ function ShopDialog({
       ref={dialog}
       className="shop-drawer"
       aria-label={title}
-      onCancel={onClose}
+      onCancel={(event) => {
+        if (busy) event.preventDefault();
+        else onClose();
+      }}
       onClick={(event) => {
-        if (event.target !== event.currentTarget) return;
+        if (busy || event.target !== event.currentTarget) return;
         const b = event.currentTarget.getBoundingClientRect();
         if (
           event.clientX < b.left ||
@@ -319,8 +376,11 @@ function ShopDialog({
     >
       <button
         className="quiet drawer-close"
-        aria-label="Close bag"
+        aria-label={
+          title === "Your bag" ? "Close bag" : `Close ${title.toLowerCase()}`
+        }
         onClick={onClose}
+        disabled={busy}
         autoFocus
       >
         Close ✕

@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- Standard images for remote fictional product photos. */
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -26,6 +26,12 @@ import {
   faWandMagicSparkles,
   faGear,
 } from "@fortawesome/free-solid-svg-icons";
+import {
+  readCheckoutOrders,
+  saveCheckoutOrder,
+  type DemoOrder,
+} from "@/lib/demo-checkout";
+import { request } from "@/lib/commerce";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 
 type View = "Home" | "Products" | "Orders" | "Page builder" | "Settings";
@@ -95,7 +101,11 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
   const [saved] = useState(readSaved);
   const [products, setProducts] = useState(saved.products);
   const [settings, setSettings] = useState(saved.settings);
-  const [view, setView] = useState<View>("Home");
+  const [view, setView] = useState<View>(() =>
+    new URLSearchParams(window.location.search).get("view") === "Orders"
+      ? "Orders"
+      : "Home",
+  );
   const [notice, setNotice] = useState("");
   const [storageError, setStorageError] = useState(false);
   const [editor, setEditor] = useState<Product | "new" | null>(null);
@@ -106,7 +116,21 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
   }
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All products");
-  const [orders, setOrders] = useState(demoOrders);
+  const [orders, setOrders] = useState<DemoOrder[]>(() => [
+    ...readCheckoutOrders(),
+    ...demoOrders,
+  ]);
+  useEffect(() => {
+    const refresh = () => setOrders([...readCheckoutOrders(), ...demoOrders]);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storecraft-orders-changed", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storecraft-orders-changed", refresh);
+    };
+  }, []);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
 
   function persist(nextProducts: Product[], nextSettings: Settings) {
@@ -257,7 +281,8 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
         >
           <div className="demo-note">
             <span className="dot" />
-            Browser sandbox · Fictional data · Changes stay on this device
+            Demo workspace · Catalog edits stay on this device · Test checkout
+            orders are saved
           </div>
           {storageError && (
             <p role="alert" className="alert">
@@ -443,7 +468,7 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
                   note={`${active.length} active products`}
                 />
                 <Stat
-                  label="Fictional paid orders"
+                  label="Paid test orders"
                   value={String(
                     orders.filter((o) => o.payment === "Paid").length,
                   )}
@@ -488,7 +513,7 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
             <>
               <div className="panel">
                 <div className="table-toolbar">
-                  <strong>Fictional order examples</strong>
+                  <strong>Test orders and sample orders</strong>
                   <span className="muted">
                     Fulfillment changes reset on reload
                   </span>
@@ -556,7 +581,56 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
                   <p>
                     Payment: {order.payment} · Fulfillment: {order.fulfillment}
                   </p>
-                  {order.payment === "Paid" &&
+                  {order.id &&
+                    order.token &&
+                    order.payment === "Paid" &&
+                    !["Delivered", "Collected"].includes(order.fulfillment) && (
+                      <button
+                        className="primary"
+                        onClick={async () => {
+                          const state =
+                            order.fulfillmentMethod === "Pickup"
+                              ? order.fulfillment === "Unfulfilled"
+                                ? "ReadyForPickup"
+                                : "Collected"
+                              : order.fulfillment === "Unfulfilled"
+                                ? "Shipped"
+                                : "Delivered";
+                          try {
+                            const result = await request<{
+                              fulfillmentState: string;
+                            }>(
+                              `/api/demo/orders/${order.id}/fulfillment`,
+                              {
+                                method: "PUT",
+                                body: JSON.stringify({
+                                  token: order.token,
+                                  state,
+                                }),
+                              },
+                              false,
+                            );
+                            saveCheckoutOrder({
+                              ...order,
+                              fulfillment: result.fulfillmentState,
+                            });
+                            setNotice("Test order fulfillment saved.");
+                          } catch (failure) {
+                            setNotice((failure as Error).message);
+                          }
+                        }}
+                      >
+                        {order.fulfillmentMethod === "Pickup"
+                          ? order.fulfillment === "Unfulfilled"
+                            ? "Mark ready for pickup"
+                            : "Mark collected"
+                          : order.fulfillment === "Unfulfilled"
+                            ? "Mark shipped"
+                            : "Mark delivered"}
+                      </button>
+                    )}
+                  {!order.id &&
+                    order.payment === "Paid" &&
                     order.fulfillment === "Unfulfilled" && (
                       <button
                         className="primary"
@@ -579,8 +653,9 @@ function Workspace({ storefrontPreview }: { storefrontPreview: boolean }) {
                 </section>
               )}
               <p className="helper">
-                These orders are examples. Checkout and payment processing have
-                not been connected.
+                Seeded examples and your saved checkout orders appear here.
+                Payments are simulated. Your checkout orders are saved in the
+                database; seeded examples stay local.
               </p>
             </>
           )}

@@ -9,6 +9,9 @@ using StoreCraft.Api.Features.Storefront;
 
 namespace StoreCraft.Api.Features.Orders;
 
+public sealed record DemoFulfillRequest(string Token, string State);
+public sealed record DemoCartItem(string Id, string Title, long Price, int Quantity);
+public sealed record PortfolioCheckoutRequest(Guid IdempotencyKey, DemoCartItem[] Items, string Name, string Email, string Street, string City, string PostalCode, string Outcome, string FulfillmentMethod, long Shipping, long Threshold);
 public sealed record CartLine(Guid ProductId, int Quantity);
 public sealed record CheckoutRequest(Guid IdempotencyKey, CartLine[] Items, string Name, string Email, string Street, string City, string PostalCode, string Country, string Outcome, string FulfillmentMethod = "Delivery");
 public sealed record FulfillRequest(string State, string TrackingNumber, string TrackingUrl);
@@ -20,6 +23,63 @@ public static class CheckoutEndpoints
     {
         var key = Convert.FromBase64String(confirmationSecret);
         string AccessToken(Guid orderId) => Convert.ToHexString(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(orderId.ToString()))).ToLowerInvariant();
+
+        // Demo catalogs are visitor-authored browser data, never a merchant's authoritative inventory.
+        // Persist their orders separately so the portfolio can exercise the same order/outbox model.
+        app.MapPost("/api/demo/checkout", async (PortfolioCheckoutRequest input, CommerceDbContext db, IDemoPayment payment, HttpContext context) =>
+        {
+            if (!app.Environment.IsDevelopment() && !app.Configuration.GetValue<bool>("Demo:Enabled")) return Results.NotFound();
+            if (context.Request.ContentLength > 32768 || input.IdempotencyKey == Guid.Empty || input.Items is null || input.Items.Length is < 1 or > 20 || input.Items.Any(i => i is null || string.IsNullOrWhiteSpace(i.Id) || i.Id.Length > 100 || string.IsNullOrWhiteSpace(i.Title) || i.Title.Length > 100 || i.Price is < 1 or > 100000000 || i.Quantity is < 1 or > 99) || input.Items.Select(i => i.Id).Distinct().Count() != input.Items.Length)
+                return Results.BadRequest(new { error = "Choose 1–20 distinct demo products with valid prices and quantities." });
+            if (string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 100 || input.Email is null || input.Email.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(input.Email, out _) || input.FulfillmentMethod is not ("Delivery" or "Pickup") || input.Outcome is not ("Paid" or "Failed") || input.Shipping is < 0 or > 1000000 || input.Threshold is < 1 or > 100000000)
+                return Results.BadRequest(new { error = "Enter valid guest details and choose a test payment result." });
+            if (input.FulfillmentMethod == "Delivery" && (string.IsNullOrWhiteSpace(input.Street) || input.Street.Length > 300 || string.IsNullOrWhiteSpace(input.City) || input.City.Length > 100 || string.IsNullOrWhiteSpace(input.PostalCode) || input.PostalCode.Length > 20))
+                return Results.BadRequest(new { error = "Enter a Singapore delivery address." });
+            var storeId = Guid.Parse("89be99ef-68de-4b0a-825a-a315f1587cf2");
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(input, PageRules.Json))));
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({"portfolio-demo-store"}, 0))");
+            if (!await db.Stores.AnyAsync(s => s.Id == storeId))
+            {
+                db.Stores.Add(new StoreCraft.Api.Features.Stores.Store { Id = storeId, OwnerUserId = storeId, Name = "StoreCraft portfolio demo", Slug = "portfolio-demo-orders", ContactEmail = "demo@example.com", CreatedAt = DateTimeOffset.UtcNow, PickupEnabled = true, PickupAddress = "Demo collection counter, Singapore" });
+                await db.SaveChangesAsync();
+            }
+            var order = await db.Orders.SingleOrDefaultAsync(o => o.StoreId == storeId && o.IdempotencyKey == input.IdempotencyKey);
+            if (order is not null && order.RequestHash != hash) return Results.Conflict(new { error = "This checkout ID was already used. Start a new checkout." });
+            var replayed = order is not null;
+            if (order is null)
+            {
+                var items = input.Items.Select(i => new PurchasedItem(new Guid(SHA256.HashData(Encoding.UTF8.GetBytes("demo:" + i.Id))[..16]), i.Title.Trim(), "DEMO-" + i.Id, i.Quantity, i.Price)).ToArray();
+                var subtotal = items.Sum(i => checked(i.UnitPrice * i.Quantity));
+                var shipping = input.FulfillmentMethod == "Pickup" || subtotal >= input.Threshold ? 0 : input.Shipping;
+                var id = Guid.NewGuid();
+                order = new Order { Id = id, StoreId = storeId, IdempotencyKey = input.IdempotencyKey, RequestHash = hash, Reference = "SC-" + id.ToString("N")[..10].ToUpperInvariant(), CustomerName = input.Name.Trim(), CustomerEmail = input.Email.Trim(), Address = input.FulfillmentMethod == "Pickup" ? "Pickup at demo collection counter, Singapore" : $"{input.Street}, {input.City}, {input.PostalCode}, Singapore", FulfillmentMethod = input.FulfillmentMethod, Subtotal = subtotal, Shipping = shipping, Total = checked(subtotal + shipping), PaymentState = payment.Settle(input.Outcome), ItemsJson = JsonSerializer.Serialize(items, PageRules.Json), CreatedAt = DateTimeOffset.UtcNow };
+                db.Orders.Add(order);
+                db.OrderEvents.Add(OrderSync.Event(order, "OrderPlaced"));
+                await db.SaveChangesAsync();
+            }
+            await transaction.CommitAsync();
+            return Results.Ok(new { order.Id, order.Reference, order.PaymentState, order.FulfillmentState, order.FulfillmentMethod, order.Total, order.Shipping, order.CreatedAt, token = AccessToken(order.Id), replayed, items = JsonSerializer.Deserialize<PurchasedItem[]>(order.ItemsJson, PageRules.Json) });
+        }).RequireRateLimiting("checkout");
+
+        app.MapPut("/api/demo/orders/{id:guid}/fulfillment", async (Guid id, DemoFulfillRequest input, CommerceDbContext db) =>
+        {
+            if (!app.Environment.IsDevelopment() && !app.Configuration.GetValue<bool>("Demo:Enabled")) return Results.NotFound();
+            var expected = AccessToken(id);
+            if (input.Token is null || input.Token.Length != expected.Length || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(input.Token), Encoding.UTF8.GetBytes(expected))) return Results.NotFound();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            var storeId = Guid.Parse("89be99ef-68de-4b0a-825a-a315f1587cf2");
+            var order = await db.Orders.FromSqlInterpolated($"SELECT * FROM commerce.\"Orders\" WHERE \"Id\" = {id} AND \"StoreId\" = {storeId} FOR UPDATE").SingleOrDefaultAsync();
+            if (order is null) return Results.NotFound();
+            var allowed = order.FulfillmentMethod == "Pickup"
+                ? (order.FulfillmentState == "Unfulfilled" && input.State == "ReadyForPickup") || (order.FulfillmentState == "ReadyForPickup" && input.State == "Collected")
+                : (order.FulfillmentState == "Unfulfilled" && input.State == "Shipped") || (order.FulfillmentState == "Shipped" && input.State == "Delivered");
+            if (order.PaymentState != "Paid" || !allowed) return Results.BadRequest(new { error = "Choose the next fulfillment step for a successfully paid test order." });
+            order.FulfillmentState = input.State;
+            db.OrderEvents.Add(OrderSync.Event(order, "FulfillmentUpdated"));
+            await db.SaveChangesAsync(); await transaction.CommitAsync();
+            return Results.Ok(new { order.FulfillmentState });
+        }).RequireRateLimiting("checkout");
 
         app.MapPost("/api/public/stores/{slug}/quote", async (string slug, QuoteRequest input, CommerceDbContext db) =>
         {
