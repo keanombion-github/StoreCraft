@@ -5,6 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "24"
+  NEXT_PUBLIC_API_URL = "https://storecraft-api.onrender.com"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

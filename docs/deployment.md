@@ -57,3 +57,5 @@ The browser retains its own order references and private receipt tokens, and dis
 OMS events use the existing OrderPlaced/FulfillmentUpdated schema. Merchant sync routes remain authenticated and scoped to owned stores; anonymous portfolio records require a separately secured integration before an OMS can consume them. Never expose a global public order list. Plan retention for persisted demo records before sustained traffic; checkout rate limiting is active.
 
 Deploy both the API and frontend update, then verify checkout, dashboard reload, and fulfillment. The provider is simulated, not Stripe.
+
+The repository now supplies NEXT_PUBLIC_API_URL=https://storecraft-api.onrender.com in netlify.toml so portfolio checkout reaches the deployed API even when the dashboard value is empty. Update this public setting if the API hostname changes.
