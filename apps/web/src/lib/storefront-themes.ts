@@ -3,9 +3,18 @@ import type { PageDocument, Section } from "./commerce";
 export const regions = ["Header", "Main", "Footer"] as const;
 export type Region = (typeof regions)[number];
 export const widgets: Record<Region, Section["type"][]> = {
-  Header: ["Navigation", "Announcement"],
-  Main: ["Container", "Hero", "FeaturedProducts", "ImageText", "Announcement"],
-  Footer: ["Footer", "Announcement"],
+  Header: ["Container", "Text", "Image", "Html", "Navigation", "Announcement"],
+  Main: [
+    "Text",
+    "Image",
+    "Html",
+    "Container",
+    "Hero",
+    "FeaturedProducts",
+    "ImageText",
+    "Announcement",
+  ],
+  Footer: ["Container", "Text", "Image", "Html", "Footer", "Announcement"],
 };
 export const themes = {
   midnight: {

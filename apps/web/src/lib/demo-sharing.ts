@@ -1,6 +1,7 @@
 import { zlibSync, Unzlib, strToU8, strFromU8 } from "fflate";
 import type { PageDocument, CatalogProduct } from "./commerce";
 import { regions, widgets } from "./storefront-themes";
+import { validateHtmlWidget } from "./html-widget";
 import { validateThemePackage } from "./theme-packages";
 export type SharedStore = {
   version: 1;
@@ -45,7 +46,9 @@ export function validateSharedStore(value: SharedStore) {
       !section.id ||
       ids.has(section.id) ||
       !regions.includes(section.region ?? "Main") ||
-      !widgets[section.region ?? "Main"].includes(section.type) ||
+      !(section.parentId
+        ? regions.some((r) => widgets[r].includes(section.type))
+        : widgets[section.region ?? "Main"].includes(section.type)) ||
       !text(section.title, 150) ||
       !text(section.text, 1000) ||
       !text(section.button, 50) ||
@@ -56,6 +59,11 @@ export function validateSharedStore(value: SharedStore) {
           section.productIds.some((id) => !text(id, 80))))
     )
       throw new Error("Invalid shared widget.");
+    if (
+      section.type === "Html" &&
+      validateHtmlWidget(section.html ?? "", section.htmlHeight ?? 240)
+    )
+      throw new Error("Invalid shared HTML widget.");
     ids.add(section.id);
     if (
       section.type === "Container" &&
@@ -78,7 +86,7 @@ export function validateSharedStore(value: SharedStore) {
         parent.type !== "Container" ||
         parent.parentId ||
         ["Container", "Navigation", "Footer"].includes(section.type) ||
-        section.region !== "Main" ||
+        section.region !== parent.region ||
         !Number.isInteger(section.column) ||
         section.column! < 0 ||
         section.column! >= (parent.columns ?? 2)

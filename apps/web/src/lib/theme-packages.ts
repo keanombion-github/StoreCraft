@@ -4,7 +4,7 @@ import { regions, widgets } from "./storefront-themes";
 
 const widgetTypes: Section["type"][] = [
   ...new Set(regions.flatMap((r) => widgets[r])),
-].filter((type) => type !== "Container");
+].filter((type) => !["Container", "Text", "Image", "Html"].includes(type));
 const tags = new Set(
   "div section article header footer h1 h2 h3 h4 h5 h6 p span img strong em small ul ol li figure figcaption br hr b i".split(
     " ",

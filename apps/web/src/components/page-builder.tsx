@@ -16,6 +16,7 @@ import {
   widgets,
   type Region,
 } from "@/lib/storefront-themes";
+import { validateHtmlWidget } from "@/lib/html-widget";
 import { ShareStorefront } from "./share-storefront";
 import { ImageUpload } from "./image-upload";
 import { PageRenderer } from "./storefront-renderer";
@@ -26,6 +27,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeading,
   faTableColumns,
+  faFont,
+  faCode,
   faImages,
   faBullhorn,
   faBox,
@@ -116,6 +119,14 @@ export function PageBuilder({
     importComplete = false,
   ) {
     if (!value || (!importComplete && uploading) || busy) return;
+    const invalidHtml = value.sections
+      .filter((s) => s.type === "Html")
+      .map((s) => validateHtmlWidget(s.html ?? "", s.htmlHeight ?? 240))
+      .find(Boolean);
+    if (invalidHtml) {
+      setError(invalidHtml);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -207,7 +218,7 @@ export function PageBuilder({
     if (
       parent &&
       (["Container", "Navigation", "Footer"].includes(item.type) ||
-        targetRegion !== "Main")
+        targetRegion !== regionOf(parent))
     )
       return;
     if (
@@ -227,7 +238,7 @@ export function PageBuilder({
       return;
     }
 
-    if (!widgets[targetRegion].includes(item.type)) {
+    if (!parent && !widgets[targetRegion].includes(item.type)) {
       setError(`${item.type} cannot go in ${targetRegion}.`);
       return;
     }
@@ -253,7 +264,12 @@ export function PageBuilder({
           : (targetItem?.column ?? 0)
         : undefined,
     });
-    change({ ...document!, sections });
+    change({
+      ...document!,
+      sections: sections.map((s) =>
+        s.parentId === id ? { ...s, region: targetRegion } : s,
+      ),
+    });
     setError("");
     setRegion(targetRegion);
     setSelected(id);
@@ -297,10 +313,6 @@ export function PageBuilder({
     beforeId = "",
   ) {
     if (locked) return;
-    if (!widgets[targetRegion].includes(type)) {
-      setError(`${type} cannot go in ${targetRegion}.`);
-      return;
-    }
     if (document!.sections.length >= 24) {
       setError("A page can have up to 24 widgets.");
       return;
@@ -320,7 +332,9 @@ export function PageBuilder({
       : null;
     if (
       slot &&
-      (!parent || ["Container", "Navigation", "Footer"].includes(type))
+      (!parent ||
+        targetRegion !== regionOf(parent) ||
+        ["Container", "Navigation", "Footer"].includes(type))
     ) {
       setError("Use content widgets inside a container.");
       return;
@@ -340,6 +354,10 @@ export function PageBuilder({
       setError("A container can hold up to eight widgets.");
       return;
     }
+    if (!parent && !widgets[targetRegion].includes(type)) {
+      setError(`${type} cannot go in ${targetRegion}.`);
+      return;
+    }
     const item: Section = {
       id: crypto.randomUUID(),
       type,
@@ -348,6 +366,12 @@ export function PageBuilder({
       column: parent ? Number(slot![2]) : undefined,
       ...(type === "Container"
         ? { columns: 2, gap: 24, alignment: "start" as const }
+        : {}),
+      ...(type === "Html"
+        ? {
+            html: "<section><h2>Your custom content</h2><p>Edit this HTML in widget settings.</p></section>",
+            htmlHeight: 240,
+          }
         : {}),
       title: type === "Container" ? "Column layout" : "New section",
       text: "",
@@ -571,19 +595,25 @@ export function PageBuilder({
                       ["Navigation", "Footer"].includes(type) &&
                       document.sections.some((s) => s.type === type);
                     const icon =
-                      type === "Container"
-                        ? faTableColumns
-                        : type === "Hero"
-                          ? faHeading
-                          : type === "ImageText"
+                      type === "Text"
+                        ? faFont
+                        : type === "Html"
+                          ? faCode
+                          : type === "Image"
                             ? faImages
-                            : type === "FeaturedProducts"
-                              ? faBox
-                              : type === "Announcement"
-                                ? faBullhorn
-                                : type === "Navigation"
-                                  ? faBars
-                                  : faGripLines;
+                            : type === "Container"
+                              ? faTableColumns
+                              : type === "Hero"
+                                ? faHeading
+                                : type === "ImageText"
+                                  ? faImages
+                                  : type === "FeaturedProducts"
+                                    ? faBox
+                                    : type === "Announcement"
+                                      ? faBullhorn
+                                      : type === "Navigation"
+                                        ? faBars
+                                        : faGripLines;
                     return (
                       <button
                         key={type}
@@ -612,7 +642,7 @@ export function PageBuilder({
                               type,
                               r,
                               section?.type === "Container" &&
-                                r === "Main" &&
+                                r === regionOf(section) &&
                                 type !== "Container"
                                 ? `column:${section.id}:${Math.min(targetColumn, (section.columns ?? 2) - 1)}`
                                 : "",
@@ -626,7 +656,9 @@ export function PageBuilder({
                               ? "Product collection"
                               : type === "ImageText"
                                 ? "Image & text"
-                                : type}
+                                : type === "Html"
+                                  ? "HTML"
+                                  : type}
                           </strong>
                           <small>
                             {singleton
@@ -974,12 +1006,12 @@ export function PageBuilder({
                       </label>
                       <p className="helper">
                         Drag content widgets into a column, or choose a column
-                        here and tap a Main widget in the library. Up to eight
-                        widgets per container.
+                        here and tap a content widget in the library. Up to
+                        eight widgets per container.
                       </p>
                     </>
                   )}
-                  {section.type !== "Container" && (
+                  {
                     <label>
                       Placement
                       <select
@@ -987,22 +1019,45 @@ export function PageBuilder({
                         value={
                           section.parentId
                             ? `column:${section.parentId}:${section.column ?? 0}`
-                            : "Main"
+                            : regionOf(section)
                         }
                         onChange={(event) =>
                           reorder(
                             section.id,
-                            event.target.value === "Main"
+                            regions.includes(event.target.value as Region)
                               ? ""
                               : event.target.value,
-                            "Main",
+                            regions.includes(event.target.value as Region)
+                              ? (event.target.value as Region)
+                              : regionOf(
+                                  document.sections.find(
+                                    (s) =>
+                                      s.id === event.target.value.split(":")[1],
+                                  )!,
+                                ),
                           )
                         }
-                        disabled={regionOf(section) !== "Main"}
+                        disabled={["Navigation", "Footer"].includes(
+                          section.type,
+                        )}
                       >
-                        <option value="Main">Main page</option>
+                        {regions
+                          .filter((r) => widgets[r].includes(section.type))
+                          .map((r) => (
+                            <option key={r} value={r}>
+                              {r} page
+                            </option>
+                          ))}
                         {document.sections
-                          .filter((s) => s.type === "Container" && !s.parentId)
+                          .filter(
+                            (s) =>
+                              section.type !== "Container" &&
+                              !["Navigation", "Footer"].includes(
+                                section.type,
+                              ) &&
+                              s.type === "Container" &&
+                              !s.parentId,
+                          )
                           .flatMap((container) =>
                             Array.from(
                               { length: container.columns ?? 2 },
@@ -1019,10 +1074,50 @@ export function PageBuilder({
                           )}
                       </select>
                     </label>
+                  }
+                  {section.type === "Html" && (
+                    <>
+                      <label>
+                        HTML code
+                        <textarea
+                          aria-label="HTML code"
+                          rows={12}
+                          maxLength={20000}
+                          value={section.html ?? ""}
+                          onChange={(event) =>
+                            update({ html: event.target.value })
+                          }
+                          spellCheck={false}
+                        />
+                      </label>
+                      <label>
+                        HTML height
+                        <input
+                          type="number"
+                          min={60}
+                          max={1200}
+                          value={section.htmlHeight ?? 240}
+                          onChange={(event) =>
+                            update({
+                              htmlHeight: Math.max(
+                                60,
+                                Math.min(1200, Number(event.target.value)),
+                              ),
+                            })
+                          }
+                        />
+                      </label>
+                      <p className="helper">
+                        Presentation HTML and inline CSS. Scripts, embedded
+                        pages and forms are blocked.
+                      </p>
+                    </>
                   )}
-                  {editable("title") && (
+                  {section.type !== "Html" && editable("title") && (
                     <label>
-                      Title
+                      {section.type === "Image"
+                        ? "Image alternative text"
+                        : "Title"}
                       <input
                         value={section.title}
                         maxLength={150}
@@ -1032,22 +1127,23 @@ export function PageBuilder({
                       />
                     </label>
                   )}
-                  {editable("text") && (
-                    <label>
-                      Text
-                      <textarea
-                        aria-label="Text"
-                        value={section.text}
-                        maxLength={1000}
-                        rows={5}
-                        onChange={(event) =>
-                          update({ text: event.target.value })
-                        }
-                      />
-                    </label>
-                  )}
+                  {!["Image", "Html"].includes(section.type) &&
+                    editable("text") && (
+                      <label>
+                        Text
+                        <textarea
+                          aria-label="Text"
+                          value={section.text}
+                          maxLength={1000}
+                          rows={5}
+                          onChange={(event) =>
+                            update({ text: event.target.value })
+                          }
+                        />
+                      </label>
+                    )}
                   {editable("image") &&
-                    ["Hero", "ImageText"].includes(section.type) && (
+                    ["Hero", "ImageText", "Image"].includes(section.type) && (
                       <>
                         <ImageUpload
                           localOnly={demo}

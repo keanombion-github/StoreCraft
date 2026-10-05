@@ -1890,3 +1890,8 @@ td {
 .storefront-share { margin: 0 0 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .storefront-share p { color: #c8bbd7; font-size: 13px; max-width: 650px; margin: 0; }
 .builder-toolbar .storefront-share { margin: 0; }
+.widget-text, .widget-image, .widget-html { display: block; padding: 24px; }
+.standalone-text p { white-space: pre-wrap; }
+.standalone-image { margin: 0; }
+.standalone-image img { display: block; max-width: 100%; height: auto; border-radius: 8px; }
+.html-widget-error { color: #f4bcbc; padding: 20px; }

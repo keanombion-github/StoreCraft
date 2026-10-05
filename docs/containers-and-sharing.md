@@ -2,9 +2,11 @@
 
 ## Column layouts
 
-Open Page builder, edit a theme, then choose **Container** in the Main widget library. Its settings offer one to eight columns, spacing, vertical alignment, and a name. Each container holds up to eight content widgets; the existing 24-widget page limit includes its children.
+Open Page builder, edit a theme, then choose **Container** in the Header, Main or Footer widget library. Its settings offer one to eight columns, spacing, vertical alignment, and a name. Each container holds up to eight content widgets; the existing 24-widget page limit includes its children.
 
-Drag content into a column. On touch screens, select a container and its destination column, then tap a Main content widget in the library. Click a child to edit its own fields. Its Placement control moves it between columns or back onto the Main page. Containers cannot contain other containers, navigation, or footers.
+Drag content into a column. On touch screens, select a container and its destination column, then tap a content widget in the matching region in the library. Click a child to edit its own fields. Its Placement control moves it between columns or back onto the page. Containers cannot contain other containers, navigation, or footers. Their Placement control moves the whole container between Header, Main and Footer, keeping its children.
+
+Separate Text, Image and HTML widgets are available in every region and inside containers. Text offers a heading and body; Image offers an upload or HTTPS URL and alternative text. The existing Image & text widget remains available. HTML offers up to 20,000 characters and a frame height of 60–1200 pixels. Presentation markup, style tags and inline CSS render in a sandboxed frame with a content security policy. Scripts, event handlers, embedded pages and forms are rejected. HTML cannot run JavaScript or control checkout. These new widgets render natively rather than through uploaded theme templates.
 
 Reducing the number of columns moves affected children into the last remaining column without deleting them. Deleting a populated container asks whether to delete its children too; move them out first to keep them. Containers cannot be duplicated yet. Columns stack on phones, including the editor's Phone preview.
 

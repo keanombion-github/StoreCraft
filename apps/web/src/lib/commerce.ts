@@ -34,6 +34,9 @@ export type CatalogProduct = {
 export type Section = {
   id: string;
   type:
+    | "Text"
+    | "Image"
+    | "Html"
     | "Container"
     | "Navigation"
     | "Hero"
@@ -47,6 +50,8 @@ export type Section = {
   button: string;
   region?: "Header" | "Main" | "Footer";
   productIds?: string[];
+  html?: string;
+  htmlHeight?: number;
   parentId?: string;
   column?: number;
   columns?: number;

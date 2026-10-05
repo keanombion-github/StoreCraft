@@ -18,3 +18,20 @@ public class Containers
         Assert.NotNull(PageRules.Validate(page with { Sections = [child with { ParentId = null, Column = 0 }] }));
     }
 }
+
+public class ContentWidgets
+{
+    [Xunit.Fact]
+    public void WidgetsAndContainerChildrenValidateInEveryRegion()
+    {
+        foreach (var region in new[]{"Header", "Main", "Footer"}) {
+            var container = new StoreCraft.Api.Features.Storefront.PageSection("anywhere", "Container", "Layout", "", "", "", Region:region);
+            var child = new StoreCraft.Api.Features.Storefront.PageSection("inside", "Text", "Text", "Content", "", "", Region:region, ParentId:container.Id, Column:0);
+            var html = new StoreCraft.Api.Features.Storefront.PageSection("markup", "Html", "", "", "", "", Region:region, Html:"<style>h2{color:purple}</style><h2>Hello</h2>");
+            var page = StoreCraft.Api.Features.Storefront.PageRules.Default with { Sections=[..StoreCraft.Api.Features.Storefront.PageRules.Default.Sections, container, child, html] };
+            Xunit.Assert.Null(StoreCraft.Api.Features.Storefront.PageRules.Validate(page));
+            Xunit.Assert.NotNull(StoreCraft.Api.Features.Storefront.PageRules.Validate(page with {Sections=[..page.Sections.Where(s => s.Id != html.Id), html with {Html="<script>alert(1)</script>"}]}));
+            Xunit.Assert.NotNull(StoreCraft.Api.Features.Storefront.PageRules.Validate(page with {Sections=[..page.Sections.Where(s => s.Id != child.Id), child with {Region=region == "Main" ? "Header" : "Main"}]}));
+        }
+    }
+}

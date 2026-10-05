@@ -5,6 +5,7 @@ import type { CatalogProduct, PageDocument, Section } from "@/lib/commerce";
 import { normalizePage, regionOf, regions } from "@/lib/storefront-themes";
 import { money } from "@/lib/demo-data";
 import { assetUrl } from "./image-upload";
+import { htmlWidgetDocument, validateHtmlWidget } from "@/lib/html-widget";
 import { themeWidgetHtml } from "@/lib/theme-packages";
 
 function ProductImage({ product }: { product: CatalogProduct }) {
@@ -394,7 +395,7 @@ export function PageRenderer({
                                   event.stopPropagation();
                                   onDropWidget(
                                     event.dataTransfer.getData("text/plain"),
-                                    "Main",
+                                    region,
                                     slot,
                                   );
                                 }}
@@ -430,6 +431,48 @@ export function PageRenderer({
                       },
                     )}
                   </div>
+                ) : section.type === "Html" ? (
+                  validateHtmlWidget(
+                    section.html ?? "",
+                    section.htmlHeight ?? 240,
+                  ) ? (
+                    <p className="html-widget-error">
+                      {validateHtmlWidget(
+                        section.html ?? "",
+                        section.htmlHeight ?? 240,
+                      )}
+                    </p>
+                  ) : (
+                    <iframe
+                      className="package-widget-frame"
+                      title="Custom HTML widget"
+                      sandbox=""
+                      referrerPolicy="no-referrer"
+                      style={{ height: section.htmlHeight ?? 240 }}
+                      srcDoc={htmlWidgetDocument(
+                        section.html ?? "",
+                        page.accent,
+                        page.themeId === "linen",
+                      )}
+                    />
+                  )
+                ) : section.type === "Text" ? (
+                  <div className="standalone-text">
+                    <h2>{section.title}</h2>
+                    <p>{section.text}</p>
+                  </div>
+                ) : section.type === "Image" ? (
+                  <figure className="standalone-image">
+                    {section.image ? (
+                      <img
+                        src={section.image}
+                        alt={section.title || "Storefront image"}
+                        loading="lazy"
+                      />
+                    ) : onSelect ? (
+                      <p>Add an image in widget settings.</p>
+                    ) : null}
+                  </figure>
                 ) : page.themePackage?.widgets[section.type] ? (
                   <>
                     <iframe

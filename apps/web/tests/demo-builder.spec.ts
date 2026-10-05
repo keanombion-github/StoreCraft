@@ -92,8 +92,18 @@ test("widget library places cards in canvas regions and opens the matching edito
   await source.dispatchEvent("dragstart", { dataTransfer: transfer });
   await mainSlot.dispatchEvent("dragover", { dataTransfer: transfer });
   await expect(mainSlot).toHaveClass(/accepts-widget/);
-  if (testInfo.project.name === "desktop") await source.dragTo(mainSlot);
-  else await mainSlot.dispatchEvent("drop", { dataTransfer: transfer });
+  if (testInfo.project.name === "desktop") {
+    await source.scrollIntoViewIfNeeded();
+    const start = (await source.boundingBox())!;
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2 + 15, {steps:5});
+    await mainSlot.scrollIntoViewIfNeeded();
+    const end = (await mainSlot.boundingBox())!;
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, {steps:10});
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2 + 1);
+    await page.mouse.up();
+  } else await mainSlot.dispatchEvent("drop", { dataTransfer: transfer });
   const editor = page.getByRole("complementary", { name: "Widget editor" });
   await expect(editor).toContainText("Main / ImageText");
   await editor.getByLabel("Title", { exact: true }).fill("A new image story");
