@@ -134,6 +134,7 @@ function Collection({
       <dialog
         ref={dialog}
         className="store-product-dialog"
+        aria-label={detail ? `${detail.title} details` : "Product details"}
         onClose={() => setDetail(null)}
       >
         {detail && (

@@ -261,9 +261,14 @@ export function Shop({
                 </>
               )}
               <div className="info-note">
-                Checkout comes in Milestone 5. This bag is a session-only
-                preview; no orders or payments are created.
+                This is a demo bag. No payment or order is created.
               </div>
+              <button
+                className="shop-button bag-continue"
+                onClick={() => setCartOpen(false)}
+              >
+                Continue shopping
+              </button>
             </>
           )}
         </ShopDialog>
@@ -285,8 +290,11 @@ function ShopDialog({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const element = dialog.current;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     element?.showModal();
     return () => {
+      document.body.style.overflow = overflow;
       element?.close();
       previous?.focus();
     };
@@ -297,8 +305,24 @@ function ShopDialog({
       className="shop-drawer"
       aria-label={title}
       onCancel={onClose}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const b = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < b.left ||
+          event.clientX > b.right ||
+          event.clientY < b.top ||
+          event.clientY > b.bottom
+        )
+          onClose();
+      }}
     >
-      <button className="quiet drawer-close" onClick={onClose} autoFocus>
+      <button
+        className="quiet drawer-close"
+        aria-label="Close bag"
+        onClick={onClose}
+        autoFocus
+      >
         Close ✕
       </button>
       {children}
