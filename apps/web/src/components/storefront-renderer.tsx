@@ -181,6 +181,7 @@ export function PageRenderer({
   catalogHref = "#catalog",
   onAdd,
   onSelect,
+  onSelectColumn,
   selected,
   onDropWidget,
   onDragWidget,
@@ -188,6 +189,7 @@ export function PageRenderer({
   onDeleteWidget,
   canDeleteWidget,
   editorLocked = false,
+  catalogSectionId,
 }: {
   document: PageDocument;
   products: CatalogProduct[];
@@ -196,6 +198,7 @@ export function PageRenderer({
   catalogHref?: string;
   onAdd?: (product: CatalogProduct) => void;
   onSelect?: (id: string) => void;
+  onSelectColumn?: (id: string, column: number) => void;
   selected?: string;
   onDropWidget?: (
     payload: string,
@@ -207,8 +210,12 @@ export function PageRenderer({
   onDeleteWidget?: (id: string) => void;
   canDeleteWidget?: (id: string) => boolean;
   editorLocked?: boolean;
+  catalogSectionId?: string;
 }) {
   const page = normalizePage(document);
+  const catalogId =
+    catalogSectionId ??
+    page.sections.find((section) => section.type === "FeaturedProducts")?.id;
   return (
     <div
       className={`widget-page theme-${page.themeId ?? "midnight"} template-${page.templateId ?? "essentials"} ${page.themePackage ? "has-package" : ""}`}
@@ -252,15 +259,15 @@ export function PageRenderer({
             </div>
           )}
           {page.sections
-            .filter((section) => regionOf(section) === region)
+            .filter(
+              (section) => regionOf(section) === region && !section.parentId,
+            )
             .map((section) => (
               <section
                 key={section.id}
                 id={
                   section.type === "FeaturedProducts"
-                    ? page.sections.find(
-                        (item) => item.type === "FeaturedProducts",
-                      )?.id === section.id
+                    ? catalogId === section.id
                       ? "catalog"
                       : `catalog-${section.id}`
                     : undefined
@@ -271,7 +278,10 @@ export function PageRenderer({
                     ? (event) => {
                         if (
                           (event.target as HTMLElement).closest(
-                            ".preview-edit,.canvas-widget-tools,.canvas-drop-slot",
+                            ".widget-section",
+                          ) !== event.currentTarget ||
+                          (event.target as HTMLElement).closest(
+                            ".preview-edit,.canvas-widget-tools,.canvas-drop-slot,.container-drop-slot",
                           )
                         )
                           return;
@@ -326,7 +336,101 @@ export function PageRenderer({
                     )}
                   </div>
                 )}
-                {page.themePackage?.widgets[section.type] ? (
+                {section.type === "Container" ? (
+                  <div
+                    className="container-columns"
+                    style={
+                      {
+                        "--container-columns": section.columns ?? 2,
+                        gap: section.gap ?? 24,
+                        alignItems: section.alignment ?? "start",
+                      } as React.CSSProperties
+                    }
+                  >
+                    {Array.from(
+                      { length: section.columns ?? 2 },
+                      (_, column) => {
+                        const children = page.sections.filter(
+                          (s) =>
+                            s.parentId === section.id &&
+                            (s.column ?? 0) === column,
+                        );
+                        const slot = `column:${section.id}:${column}`;
+                        return (
+                          <div
+                            className="container-column"
+                            key={column}
+                            data-container={section.id}
+                            data-column={column}
+                          >
+                            {onDropWidget && (
+                              <div
+                                className="container-drop-slot"
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Select column ${column + 1}`}
+                                onClick={() =>
+                                  onSelectColumn?.(section.id, column)
+                                }
+                                onKeyDown={(event) => {
+                                  if (
+                                    event.key === "Enter" ||
+                                    event.key === " "
+                                  ) {
+                                    event.preventDefault();
+                                    onSelectColumn?.(section.id, column);
+                                  }
+                                }}
+                                onDragOver={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  event.dataTransfer.dropEffect =
+                                    event.dataTransfer.effectAllowed === "move"
+                                      ? "move"
+                                      : "copy";
+                                }}
+                                onDrop={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onDropWidget(
+                                    event.dataTransfer.getData("text/plain"),
+                                    "Main",
+                                    slot,
+                                  );
+                                }}
+                              >
+                                Column {column + 1} · Drop widget here
+                              </div>
+                            )}
+                            {!!children.length && (
+                              <PageRenderer
+                                document={{
+                                  ...page,
+                                  sections: children.map((child) => ({
+                                    ...child,
+                                    parentId: undefined,
+                                  })),
+                                }}
+                                products={products}
+                                storeName={storeName}
+                                catalogSectionId={catalogId}
+                                contactEmail={contactEmail}
+                                catalogHref={catalogHref}
+                                onAdd={onAdd}
+                                onSelect={onSelect}
+                                selected={selected}
+                                onDragWidget={onDragWidget}
+                                onDeleteWidget={onDeleteWidget}
+                                canDeleteWidget={canDeleteWidget}
+                                editorLocked={editorLocked}
+                              />
+                            )}
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                ) : page.themePackage?.widgets[section.type] ? (
                   <>
                     <iframe
                       className="package-widget-frame"
@@ -441,7 +545,7 @@ export function PageRenderer({
                       event.preventDefault();
                       event.stopPropagation();
                       const list = page.sections.filter(
-                        (s) => regionOf(s) === region,
+                        (s) => regionOf(s) === region && !s.parentId,
                       );
                       onDropWidget(
                         event.dataTransfer.getData("text/plain"),

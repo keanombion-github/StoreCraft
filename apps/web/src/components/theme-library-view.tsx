@@ -1,5 +1,6 @@
 "use client";
-import type { PageDocument } from "@/lib/commerce";
+import { ShareStorefront } from "./share-storefront";
+import type { PageDocument, CatalogProduct } from "@/lib/commerce";
 import { libraryEntries, themeKey } from "@/lib/theme-library";
 import { themes } from "@/lib/storefront-themes";
 import { downloadTheme } from "@/lib/theme-download";
@@ -16,6 +17,9 @@ export function ThemeLibraryView({
   onUpload,
   onBusy,
   slug,
+  demo = false,
+  products = [],
+  storeName = "StoreCraft",
 }: {
   document: PageDocument;
   published: PageDocument | null;
@@ -26,6 +30,9 @@ export function ThemeLibraryView({
   onUpload: (page: PageDocument) => void;
   onBusy: (busy: boolean) => void;
   slug: string;
+  demo?: boolean;
+  products?: CatalogProduct[];
+  storeName?: string;
 }) {
   const cards = [
     ...Object.entries(themes).map(([id, theme]) => ({
@@ -65,6 +72,13 @@ export function ThemeLibraryView({
           </a>
         )}
       </header>
+      <ShareStorefront
+        published={published}
+        products={products}
+        storeName={storeName}
+        slug={slug}
+        demo={demo}
+      />
       <section className="theme-active-section" aria-label="Active theme">
         <h3>Active theme</h3>
         {!published && (

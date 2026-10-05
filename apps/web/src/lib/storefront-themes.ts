@@ -4,7 +4,7 @@ export const regions = ["Header", "Main", "Footer"] as const;
 export type Region = (typeof regions)[number];
 export const widgets: Record<Region, Section["type"][]> = {
   Header: ["Navigation", "Announcement"],
-  Main: ["Hero", "FeaturedProducts", "ImageText", "Announcement"],
+  Main: ["Container", "Hero", "FeaturedProducts", "ImageText", "Announcement"],
   Footer: ["Footer", "Announcement"],
 };
 export const themes = {

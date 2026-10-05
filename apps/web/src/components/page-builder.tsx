@@ -16,6 +16,7 @@ import {
   widgets,
   type Region,
 } from "@/lib/storefront-themes";
+import { ShareStorefront } from "./share-storefront";
 import { ImageUpload } from "./image-upload";
 import { PageRenderer } from "./storefront-renderer";
 import { readDemoPage } from "@/lib/demo-page";
@@ -24,6 +25,7 @@ import { chooseTheme, libraryEntries, themeKey } from "@/lib/theme-library";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faHeading,
+  faTableColumns,
   faImages,
   faBullhorn,
   faBox,
@@ -49,6 +51,7 @@ export function PageBuilder({
   const [screen, setScreen] = useState<"library" | "editor">("library");
   const [published, setPublished] = useState<PageDocument | null>(null);
   const [selected, setSelected] = useState("");
+  const [targetColumn, setTargetColumn] = useState(0);
   const [region, setRegion] = useState<Region>("Main");
   const [dragged, setDragged] = useState("");
   const [error, setError] = useState("");
@@ -178,8 +181,9 @@ export function PageBuilder({
   const section = document.sections.find((item) => item.id === selected);
   const editable = (field: string) =>
     !section ||
-    !document.themePackage?.widgets[section.type] ||
-    document.themePackage.widgets[section.type]!.fields.includes(field);
+    (section.type !== "Container" &&
+      (!document.themePackage?.widgets[section.type] ||
+        document.themePackage.widgets[section.type]!.fields.includes(field)));
   const locked = busy || uploading;
   function update(values: Partial<Section>) {
     change({
@@ -192,14 +196,47 @@ export function PageBuilder({
   function reorder(id: string, targetId: string, targetRegion: Region) {
     const item = document!.sections.find((s) => s.id === id);
     if (!item || id === targetId) return;
+    const slot = targetId.startsWith("column:") ? targetId.split(":") : null;
+    const targetItem = document!.sections.find((s) => s.id === targetId);
+    const parent = document!.sections.find(
+      (s) =>
+        s.id === (slot ? slot[1] : targetItem?.parentId) &&
+        s.type === "Container",
+    );
+    if (slot && !parent) return;
+    if (
+      parent &&
+      (["Container", "Navigation", "Footer"].includes(item.type) ||
+        targetRegion !== "Main")
+    )
+      return;
+    if (
+      slot &&
+      parent &&
+      (!Number.isInteger(Number(slot[2])) ||
+        Number(slot[2]) < 0 ||
+        Number(slot[2]) >= (parent.columns ?? 2))
+    )
+      return;
+    if (
+      parent &&
+      document!.sections.filter((s) => s.parentId === parent.id && s.id !== id)
+        .length >= 8
+    ) {
+      setError("A container can hold up to eight widgets.");
+      return;
+    }
+
     if (!widgets[targetRegion].includes(item.type)) {
       setError(`${item.type} cannot go in ${targetRegion}.`);
       return;
     }
     if (
+      !item.parentId &&
       regionOf(item) === "Main" &&
       targetRegion !== "Main" &&
-      document!.sections.filter((s) => regionOf(s) === "Main").length === 1
+      document!.sections.filter((s) => regionOf(s) === "Main" && !s.parentId)
+        .length === 1
     ) {
       setError("Keep at least one widget in Main.");
       return;
@@ -209,6 +246,12 @@ export function PageBuilder({
     sections.splice(target < 0 ? sections.length : target, 0, {
       ...item,
       region: targetRegion,
+      parentId: parent?.id,
+      column: parent
+        ? slot
+          ? Number(slot[2])
+          : (targetItem?.column ?? 0)
+        : undefined,
     });
     change({ ...document!, sections });
     setError("");
@@ -221,18 +264,31 @@ export function PageBuilder({
       !!item &&
       !locked &&
       !(
+        !item.parentId &&
         regionOf(item) === "Main" &&
-        document!.sections.filter((s) => regionOf(s) === "Main").length === 1
+        document!.sections.filter((s) => regionOf(s) === "Main" && !s.parentId)
+          .length === 1
       )
     );
   }
   function deleteWidget(id: string) {
     if (!canDelete(id)) return;
+    const children = document!.sections.filter((s) => s.parentId === id);
+    if (
+      children.length &&
+      !window.confirm(
+        "Delete this container and its widgets? Cancel to keep them, or move the widgets out first.",
+      )
+    )
+      return;
     change({
       ...document!,
-      sections: document!.sections.filter((s) => s.id !== id),
+      sections: document!.sections.filter(
+        (s) => s.id !== id && s.parentId !== id,
+      ),
     });
-    if (selected === id) setSelected("");
+    if (selected === id || children.some((child) => child.id === selected))
+      setSelected("");
     setError("");
   }
   function addWidget(
@@ -256,11 +312,44 @@ export function PageBuilder({
       setError(`Your page already has a ${type} widget. Select it to edit it.`);
       return;
     }
+    const slot = beforeId.startsWith("column:") ? beforeId.split(":") : null;
+    const parent = slot
+      ? document!.sections.find(
+          (s) => s.id === slot[1] && s.type === "Container",
+        )
+      : null;
+    if (
+      slot &&
+      (!parent || ["Container", "Navigation", "Footer"].includes(type))
+    ) {
+      setError("Use content widgets inside a container.");
+      return;
+    }
+    if (
+      slot &&
+      parent &&
+      (!Number.isInteger(Number(slot[2])) ||
+        Number(slot[2]) < 0 ||
+        Number(slot[2]) >= (parent.columns ?? 2))
+    )
+      return;
+    if (
+      parent &&
+      document!.sections.filter((s) => s.parentId === parent.id).length >= 8
+    ) {
+      setError("A container can hold up to eight widgets.");
+      return;
+    }
     const item: Section = {
       id: crypto.randomUUID(),
       type,
       region: targetRegion,
-      title: "New section",
+      parentId: parent?.id,
+      column: parent ? Number(slot![2]) : undefined,
+      ...(type === "Container"
+        ? { columns: 2, gap: 24, alignment: "start" as const }
+        : {}),
+      title: type === "Container" ? "Column layout" : "New section",
       text: "",
       image: "",
       button: "",
@@ -300,6 +389,9 @@ export function PageBuilder({
           published={published}
           locked={locked}
           slug={store.slug}
+          demo={demo}
+          products={products}
+          storeName={store.name}
           onBusy={setUploading}
           onUpload={(value) => {
             change(value);
@@ -392,6 +484,13 @@ export function PageBuilder({
         >
           Publish
         </button>
+        <ShareStorefront
+          published={published}
+          products={products}
+          storeName={store.name}
+          slug={store.slug}
+          demo={demo}
+        />
         <a
           className="quiet"
           href={`/s/${store.slug}`}
@@ -472,17 +571,19 @@ export function PageBuilder({
                       ["Navigation", "Footer"].includes(type) &&
                       document.sections.some((s) => s.type === type);
                     const icon =
-                      type === "Hero"
-                        ? faHeading
-                        : type === "ImageText"
-                          ? faImages
-                          : type === "FeaturedProducts"
-                            ? faBox
-                            : type === "Announcement"
-                              ? faBullhorn
-                              : type === "Navigation"
-                                ? faBars
-                                : faGripLines;
+                      type === "Container"
+                        ? faTableColumns
+                        : type === "Hero"
+                          ? faHeading
+                          : type === "ImageText"
+                            ? faImages
+                            : type === "FeaturedProducts"
+                              ? faBox
+                              : type === "Announcement"
+                                ? faBullhorn
+                                : type === "Navigation"
+                                  ? faBars
+                                  : faGripLines;
                     return (
                       <button
                         key={type}
@@ -506,7 +607,16 @@ export function PageBuilder({
                               document.sections.find((s) => s.type === type)!
                                 .id,
                             );
-                          else addWidget(type, r);
+                          else
+                            addWidget(
+                              type,
+                              r,
+                              section?.type === "Container" &&
+                                r === "Main" &&
+                                type !== "Container"
+                                ? `column:${section.id}:${Math.min(targetColumn, (section.columns ?? 2) - 1)}`
+                                : "",
+                            );
                         }}
                       >
                         <FontAwesomeIcon icon={icon} />
@@ -613,7 +723,13 @@ export function PageBuilder({
                             disabled={
                               locked ||
                               document.sections.length >= 24 ||
-                              ["Navigation", "Footer"].includes(item.type)
+                              (!!item.parentId &&
+                                document.sections.filter(
+                                  (s) => s.parentId === item.parentId,
+                                ).length >= 8) ||
+                              ["Navigation", "Footer", "Container"].includes(
+                                item.type,
+                              )
                             }
                             onClick={() => {
                               const copy = { ...item, id: crypto.randomUUID() };
@@ -721,6 +837,10 @@ export function PageBuilder({
               storeName={store.name}
               contactEmail={store.contactEmail}
               onSelect={select}
+              onSelectColumn={(id, column) => {
+                select(id);
+                setTargetColumn(column);
+              }}
               selected={selected}
               onDragWidget={setDragged}
               onDropWidget={dropWidget}
@@ -755,6 +875,151 @@ export function PageBuilder({
                   <p className="widget-location">
                     {regionOf(section)} / {section.type}
                   </p>
+                  {section.type === "Container" && (
+                    <>
+                      <label>
+                        Container name
+                        <input
+                          value={section.title}
+                          maxLength={150}
+                          onChange={(event) =>
+                            update({ title: event.target.value })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Columns
+                        <select
+                          aria-label="Columns"
+                          value={section.columns ?? 2}
+                          onChange={(event) => {
+                            const columns = Number(event.target.value);
+                            change({
+                              ...document,
+                              sections: document.sections.map((s) =>
+                                s.id === section.id
+                                  ? { ...s, columns }
+                                  : s.parentId === section.id
+                                    ? {
+                                        ...s,
+                                        column: Math.min(
+                                          s.column ?? 0,
+                                          columns - 1,
+                                        ),
+                                      }
+                                    : s,
+                              ),
+                            });
+                            setTargetColumn(0);
+                          }}
+                        >
+                          {Array.from({ length: 8 }, (_, i) => (
+                            <option key={i} value={i + 1}>
+                              {i + 1}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Column spacing
+                        <select
+                          value={section.gap ?? 24}
+                          onChange={(event) =>
+                            update({ gap: Number(event.target.value) })
+                          }
+                        >
+                          {[0, 8, 16, 24, 32, 48].map((gap) => (
+                            <option key={gap} value={gap}>
+                              {gap} px
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Vertical alignment
+                        <select
+                          value={section.alignment ?? "start"}
+                          onChange={(event) =>
+                            update({
+                              alignment: event.target
+                                .value as Section["alignment"],
+                            })
+                          }
+                        >
+                          <option value="start">Top</option>
+                          <option value="center">Center</option>
+                          <option value="end">Bottom</option>
+                        </select>
+                      </label>
+                      <label>
+                        Add widgets to column
+                        <select
+                          value={Math.min(
+                            targetColumn,
+                            (section.columns ?? 2) - 1,
+                          )}
+                          onChange={(event) =>
+                            setTargetColumn(Number(event.target.value))
+                          }
+                        >
+                          {Array.from(
+                            { length: section.columns ?? 2 },
+                            (_, i) => (
+                              <option key={i} value={i}>
+                                Column {i + 1}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      <p className="helper">
+                        Drag content widgets into a column, or choose a column
+                        here and tap a Main widget in the library. Up to eight
+                        widgets per container.
+                      </p>
+                    </>
+                  )}
+                  {section.type !== "Container" && (
+                    <label>
+                      Placement
+                      <select
+                        aria-label="Placement"
+                        value={
+                          section.parentId
+                            ? `column:${section.parentId}:${section.column ?? 0}`
+                            : "Main"
+                        }
+                        onChange={(event) =>
+                          reorder(
+                            section.id,
+                            event.target.value === "Main"
+                              ? ""
+                              : event.target.value,
+                            "Main",
+                          )
+                        }
+                        disabled={regionOf(section) !== "Main"}
+                      >
+                        <option value="Main">Main page</option>
+                        {document.sections
+                          .filter((s) => s.type === "Container" && !s.parentId)
+                          .flatMap((container) =>
+                            Array.from(
+                              { length: container.columns ?? 2 },
+                              (_, i) => (
+                                <option
+                                  key={`${container.id}:${i}`}
+                                  value={`column:${container.id}:${i}`}
+                                >
+                                  {container.title || "Container"} · Column{" "}
+                                  {i + 1}
+                                </option>
+                              ),
+                            ),
+                          )}
+                      </select>
+                    </label>
+                  )}
                   {editable("title") && (
                     <label>
                       Title

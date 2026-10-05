@@ -59,10 +59,11 @@ public class ThemesAndPickup
             var id = JsonNode.Parse(await productResponse.Content.ReadAsStringAsync())!["id"]!.GetValue<Guid>();
             var package = new ThemePackage(1, "Fixture theme", "1.0.0", "body { color: white; }", new() { ["Hero"] = new("<h2>{{title}}</h2>", 300, ["title"]) });
             var themeEntry = new ThemeLibraryEntry("uploaded-fixture", "linen", "#a78bfa", "Georgia", package);
-            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish",PageRules.Default with { ThemeId="linen", Font="Georgia", ThemePackage=package, ThemeLibrary=[themeEntry], ThemeKey=themeEntry.Id })).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/merchant/page/publish",PageRules.Default with { ThemeId="linen", Font="Georgia", ThemePackage=package, ThemeLibrary=[themeEntry], ThemeKey=themeEntry.Id, Sections=[..PageRules.Default.Sections, new("columns", "Container", "Two columns", "", "", "", Columns:2), new("column-child", "Announcement", "Shared column content", "", "", "", ParentId:"columns", Column:1)] })).StatusCode);
             var publicPage = JsonNode.Parse(await client.GetStringAsync($"/api/public/stores/{slug}"))!;
             Assert.Equal("Fixture theme", publicPage["document"]!["themePackage"]!["name"]!.GetValue<string>());
             Assert.Null(publicPage["document"]!["themeLibrary"]);
+            Assert.Equal("columns", publicPage["document"]!["sections"]!.AsArray().Single(s => s!["id"]!.GetValue<string>() == "column-child")!["parentId"]!.GetValue<string>());
             var merchantPage = JsonNode.Parse(await client.GetStringAsync("/api/merchant/page"))!;
             Assert.Equal("uploaded-fixture", merchantPage["publishedDocument"]!["themeKey"]!.GetValue<string>());
             Assert.Single(merchantPage["document"]!["themeLibrary"]!.AsArray());

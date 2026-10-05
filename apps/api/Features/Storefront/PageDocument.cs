@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace StoreCraft.Api.Features.Storefront;
 
-public sealed record PageSection(string Id, string Type, string Title, string Text, string Image, string Button, string Region = "Main", Guid[]? ProductIds = null);
+public sealed record PageSection(string Id, string Type, string Title, string Text, string Image, string Button, string Region = "Main", Guid[]? ProductIds = null, string? ParentId = null, int? Column = null, int? Columns = null, int? Gap = null, string? Alignment = null);
 public sealed record PageDocument(int SchemaVersion, string Accent, string Font, PageSection[] Sections, string ThemeId = "midnight", string TemplateId = "essentials", string Logo = "", string LogoAlt = "", ThemePackage? ThemePackage = null, ThemeLibraryEntry[]? ThemeLibrary = null, string? ThemeKey = null);
 public sealed class PublishedPage
 {
@@ -64,19 +64,31 @@ public static partial class PageRules
         if (document.Sections.Select(section => section.Id).Distinct().Count() != document.Sections.Length) return "Section IDs must be unique.";
         foreach (var section in document.Sections)
         {
-            if (string.IsNullOrWhiteSpace(section.Id) || section.Id.Length > 80 || section.Type is not ("Navigation" or "Hero" or "FeaturedProducts" or "ImageText" or "Announcement" or "Footer")) return "Invalid section ID or widget type.";
+            if (string.IsNullOrWhiteSpace(section.Id) || section.Id.Length > 80 || section.Type is not ("Container" or "Navigation" or "Hero" or "FeaturedProducts" or "ImageText" or "Announcement" or "Footer")) return "Invalid section ID or widget type.";
+            if (section.Type == "Container")
+            {
+                if (document.SchemaVersion != 2 || section.ParentId is not null || (section.Columns ?? 2) is < 1 or > 8 || (section.Gap ?? 24) is not (0 or 8 or 16 or 24 or 32 or 48) || (section.Alignment ?? "start") is not ("start" or "center" or "end")) return "Containers support 1–8 columns, supported spacing and alignment, without nesting.";
+                if (document.Sections.Count(s => s.ParentId == section.Id) > 8) return "A container can hold up to eight widgets.";
+            }
+            else if (section.Columns is not null || section.Gap is not null || section.Alignment is not null) return "Column settings belong to containers.";
+            if (section.ParentId is { } parentId)
+            {
+                var parent = document.Sections.SingleOrDefault(s => s.Id == parentId);
+                if (document.SchemaVersion != 2 || parent is null || parent.Type != "Container" || parent.ParentId is not null || section.Region != "Main" || section.Type is "Container" or "Navigation" or "Footer" || section.Column is null || section.Column < 0 || section.Column >= (parent.Columns ?? 2)) return "Choose a valid container and column for this content widget.";
+            }
+            else if (section.Column is not null) return "A column must belong to a container.";
             if (document.SchemaVersion == 2 && !Allowed(section.Type, section.Region)) return "That widget is not allowed in this region.";
             if (section.ProductIds is { } ids && (ids.Length > 24 || ids.Any(id => id == Guid.Empty) || ids.Distinct().Count() != ids.Length || (ids.Length > 0 && section.Type != "FeaturedProducts"))) return "Choose up to 24 unique featured products.";
             if (section.Title is null || section.Title.Length > 150 || section.Text is null || section.Text.Length > 1000 || section.Button is null || section.Button.Length > 50 || section.Image is null || section.Image.Length > 1000) return "A widget field is missing or too long.";
             if (section.Image.Length > 0 && (!Uri.TryCreate(section.Image, UriKind.Absolute, out var uri) || uri.Scheme != "https")) return "Widget images must use an HTTPS URL.";
         }
-        if (document.SchemaVersion == 2 && (document.Sections.Count(section => section.Type == "Navigation") > 1 || document.Sections.Count(section => section.Type == "Footer") > 1 || !document.Sections.Any(section => section.Region == "Main"))) return "Use at most one navigation and one footer, and keep at least one main-content widget.";
+        if (document.SchemaVersion == 2 && (document.Sections.Count(section => section.Type == "Navigation") > 1 || document.Sections.Count(section => section.Type == "Footer") > 1 || !document.Sections.Any(section => section.Region == "Main" && section.ParentId is null))) return "Use at most one navigation and one footer, and keep at least one main-content widget.";
         return null;
     }
     public static bool Allowed(string type, string region) => region switch
     {
         "Header" => type is "Navigation" or "Announcement",
-        "Main" => type is "Hero" or "FeaturedProducts" or "ImageText" or "Announcement",
+        "Main" => type is "Container" or "Hero" or "FeaturedProducts" or "ImageText" or "Announcement",
         "Footer" => type is "Footer" or "Announcement",
         _ => false
     };

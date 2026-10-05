@@ -2,7 +2,9 @@ import { Unzip, UnzipInflate, strFromU8 } from "fflate";
 import type { ThemePackage, Section, PageDocument } from "./commerce";
 import { regions, widgets } from "./storefront-themes";
 
-const widgetTypes = [...new Set(regions.flatMap((r) => widgets[r]))];
+const widgetTypes: Section["type"][] = [
+  ...new Set(regions.flatMap((r) => widgets[r])),
+].filter((type) => type !== "Container");
 const tags = new Set(
   "div section article header footer h1 h2 h3 h4 h5 h6 p span img strong em small ul ol li figure figcaption br hr b i".split(
     " ",

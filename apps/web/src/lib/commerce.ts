@@ -34,6 +34,7 @@ export type CatalogProduct = {
 export type Section = {
   id: string;
   type:
+    | "Container"
     | "Navigation"
     | "Hero"
     | "FeaturedProducts"
@@ -46,6 +47,11 @@ export type Section = {
   button: string;
   region?: "Header" | "Main" | "Footer";
   productIds?: string[];
+  parentId?: string;
+  column?: number;
+  columns?: number;
+  gap?: number;
+  alignment?: "start" | "center" | "end";
 };
 export type PageDocument = {
   themeLibrary?: ThemeLibraryEntry[];

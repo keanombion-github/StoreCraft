@@ -1868,3 +1868,25 @@ td {
 .theme-upload-button:focus-within { outline: 2px solid #dcc5ff; outline-offset: 3px; }
 .theme-upload-button:has(input:disabled) { opacity: .5; cursor: wait; }
 @media (max-width: 700px) { .theme-active-grid .theme-manager-card { grid-template-columns: minmax(0, 1fr); } .theme-active-grid .theme-card-preview { grid-row: auto; } }
+.builder-layout > .builder-controls:not(.widget-inspector) { position: sticky; top: 90px; max-height: calc(100dvh - 110px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.widget-container { display: block; padding: 24px; }
+.container-columns { display: grid; grid-template-columns: repeat(var(--container-columns), minmax(0, 1fr)); }
+.container-column { min-width: 0; }
+.container-column .widget-page { background: transparent; }
+.container-column .store-region { border: 0; }
+.container-column .preview-region-label { display: none; }
+.container-column .widget-section { padding: 20px; min-width: 0; }
+.container-column .widget-hero, .container-column .widget-imagetext { grid-template-columns: minmax(0, 1fr); }
+.container-column .widget-section h2 { font-size: clamp(18px, 2vw, 30px); overflow-wrap: anywhere; }
+.container-column .product-grid { grid-template-columns: minmax(0, 1fr); }
+.container-column .collection-heading { flex-direction: column; align-items: stretch; }
+.container-column .catalog-search { min-width: 0; }
+.container-column .canvas-widget-tools { flex-wrap: wrap; position: static; }
+.container-drop-slot { border: 1px dashed #c6a0ff; background: #aa80e51a; color: #e8d7ff; padding: 16px 8px; margin-bottom: 12px; font-size: 12px; text-align: center; cursor: pointer; }
+.container-drop-slot:hover, .container-drop-slot:focus { background: #aa80e536; }
+.phone-preview .container-columns { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1000px) { .container-columns { grid-template-columns: repeat(min(2, var(--container-columns)), minmax(0, 1fr)); } }
+@media (max-width: 700px) { .container-columns { grid-template-columns: minmax(0, 1fr); } .builder-layout > .builder-controls:not(.widget-inspector) { top: 70px; max-height: 240px; z-index: 8; background: #17121ff5; } }
+.storefront-share { margin: 0 0 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.storefront-share p { color: #c8bbd7; font-size: 13px; max-width: 650px; margin: 0; }
+.builder-toolbar .storefront-share { margin: 0; }

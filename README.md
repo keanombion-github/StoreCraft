@@ -96,3 +96,5 @@ Do not reuse or modify another project's database without a deliberate allocatio
 See [docs/decisions.md](docs/decisions.md) for decision notes.
 
 
+
+The page builder now supports flat column containers and shareable demo snapshots. See [containers and sharing](docs/containers-and-sharing.md) for controls, responsive behavior, link limits and hosting requirements.
