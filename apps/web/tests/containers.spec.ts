@@ -12,9 +12,10 @@ test("containers retain editable children, remap columns, and publish responsive
   await inspector.getByLabel("Title", {exact:true}).fill("Inside column eight");
   const container = page.locator(".widget-container");
   await expect(container.locator('[data-column="7"] .widget-imagetext')).toContainText("Inside column eight");
-  await container.getByRole("button", {name: "Edit Container", exact:true}).click();
+  await inspector.getByRole("button", {name:"Edit parent container", exact:true}).click();
   await inspector.getByLabel("Columns", {exact:true}).selectOption("2");
   await expect(container.locator('[data-column="1"] .widget-imagetext')).toContainText("Inside column eight");
+  if (testInfo.project.name === "phone") await inspector.getByRole("button", {name:"Close widget editor",exact:true}).click();
   await container.getByRole("button", {name: "Edit ImageText", exact:true}).click();
   await inspector.getByLabel("Text", {exact:true}).fill("Child stays editable");
   await inspector.getByLabel("Placement", {exact:true}).selectOption("Main");

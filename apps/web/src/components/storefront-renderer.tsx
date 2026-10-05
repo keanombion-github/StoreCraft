@@ -311,6 +311,7 @@ export function PageRenderer({
                     </button>
                     <button
                       className="preview-edit"
+                      aria-label={`Edit ${section.type}`}
                       draggable={!editorLocked && !!onDragWidget}
                       onDragStart={(event) => {
                         event.dataTransfer.setData("text/plain", section.id);
@@ -318,7 +319,14 @@ export function PageRenderer({
                       }}
                       onClick={() => onSelect(section.id)}
                     >
-                      Edit {section.type}
+                      Edit{" "}
+                      {section.type === "Html"
+                        ? "HTML"
+                        : section.type === "ImageText"
+                          ? "image & text"
+                          : section.type === "FeaturedProducts"
+                            ? "collection"
+                            : section.type}
                     </button>
                     {onDeleteWidget && (
                       <button

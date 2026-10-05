@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   request,
   type PageDocument,
@@ -50,6 +50,7 @@ export function PageBuilder({
   onPublished?: () => void;
   demo?: boolean;
 }) {
+  const inspectorRef = useRef<HTMLElement>(null);
   const [document, setDocument] = useState<PageDocument | null>(null);
   const [screen, setScreen] = useState<"library" | "editor">("library");
   const [published, setPublished] = useState<PageDocument | null>(null);
@@ -62,6 +63,8 @@ export function PageBuilder({
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [libraryExpanded, setLibraryExpanded] = useState(true);
+  const [history, setHistory] = useState<PageDocument[]>([]);
   const [phone, setPhone] = useState(false);
   const [template, setTemplate] = useState<"essentials" | "editorial">(
     "essentials",
@@ -102,11 +105,50 @@ export function PageBuilder({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, uploading]);
+  useEffect(() => {
+    if (!selected || screen !== "editor") return;
+    inspectorRef.current?.focus({ preventScroll: true });
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected("");
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selected, screen]);
   function change(value: PageDocument) {
+    if (document) setHistory((previous) => [...previous.slice(-19), document]);
     setDocument({ ...value, themeLibrary: libraryEntries(value) });
     setDirty(true);
     onDirtyChange?.(true);
     setMessage("");
+  }
+  function undo() {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setDocument(previous);
+    setHistory(history.slice(0, -1));
+    setSelected((current) =>
+      previous.sections.some((s) => s.id === current) ? current : "",
+    );
+    setDirty(true);
+    onDirtyChange?.(true);
+    setMessage("Last change undone. Save or publish to keep it.");
+    setError("");
+  }
+  function shiftWidget(item: Section, direction: number) {
+    const siblings = document!.sections.filter(
+      (s) => regionOf(s) === regionOf(item) && s.parentId === item.parentId,
+    );
+    const index = siblings.findIndex((s) => s.id === item.id);
+    const neighbor = siblings[index + direction];
+    if (!neighbor) return;
+    if (direction < 0) reorder(item.id, neighbor.id, regionOf(item));
+    else reorder(neighbor.id, item.id, regionOf(item));
+  }
+  function canShift(item: Section, direction: number) {
+    const siblings = document!.sections.filter(
+      (s) => regionOf(s) === regionOf(item) && s.parentId === item.parentId,
+    );
+    return !!siblings[siblings.findIndex((s) => s.id === item.id) + direction];
   }
   function select(id: string) {
     setSelected(id);
@@ -491,6 +533,13 @@ export function PageBuilder({
                 ? "Unsaved changes"
                 : "Draft up to date"}
         </span>
+        <button
+          className="secondary"
+          disabled={locked || !history.length}
+          onClick={undo}
+        >
+          Undo
+        </button>
         <button className="secondary" onClick={() => setPhone(!phone)}>
           {phone ? "Desktop preview" : "Phone preview"}
         </button>
@@ -580,8 +629,19 @@ export function PageBuilder({
           className={`builder-layout ${section ? "has-inspector" : ""}`}
           onDragEnd={() => setDragged("")}
         >
-          <aside className="panel builder-controls">
-            <h2>Widget library</h2>
+          <aside
+            className={`panel builder-controls widget-library-panel ${libraryExpanded ? "library-expanded" : "library-collapsed"}`}
+          >
+            <div className="library-heading">
+              <h2>Widget library</h2>
+              <button
+                className="quiet library-toggle"
+                aria-expanded={libraryExpanded}
+                onClick={() => setLibraryExpanded(!libraryExpanded)}
+              >
+                {libraryExpanded ? "Hide widgets" : "Show widgets"}
+              </button>
+            </div>
             <p className="helper">
               Drag a card into a highlighted space. On touch screens, choose a
               region and tap a card.
@@ -702,9 +762,9 @@ export function PageBuilder({
                       {r}
                       <span>{items.length}</span>
                     </button>
-                    {items.map((item, index) => (
+                    {items.map((item) => (
                       <div
-                        className={`widget-list ${item.id === selected ? "selected-widget" : ""}`}
+                        className={`widget-list ${item.parentId ? "child-widget" : ""} ${item.id === selected ? "selected-widget" : ""}`}
                         key={item.id}
                         draggable={!locked}
                         onDragStart={(event) => {
@@ -728,25 +788,35 @@ export function PageBuilder({
                           className="text-link widget-select"
                           onClick={() => select(item.id)}
                         >
-                          {item.type}
+                          {item.type === "Html"
+                            ? "HTML"
+                            : item.type === "ImageText"
+                              ? "Image & text"
+                              : item.type === "FeaturedProducts"
+                                ? "Product collection"
+                                : item.type}
+                          {item.parentId && (
+                            <small>
+                              Column {(item.column ?? 0) + 1} ·{" "}
+                              {document.sections.find(
+                                (s) => s.id === item.parentId,
+                              )?.title || "Container"}
+                            </small>
+                          )}
                           <small>{item.title || "Store branding"}</small>
                         </button>
                         <div className="widget-actions">
                           <button
                             aria-label={`Move ${item.type} up`}
-                            disabled={locked || index === 0}
-                            onClick={() =>
-                              reorder(item.id, items[index - 1].id, r)
-                            }
+                            disabled={locked || !canShift(item, -1)}
+                            onClick={() => shiftWidget(item, -1)}
                           >
                             ↑
                           </button>
                           <button
                             aria-label={`Move ${item.type} down`}
-                            disabled={locked || index === items.length - 1}
-                            onClick={() =>
-                              reorder(items[index + 1].id, item.id, r)
-                            }
+                            disabled={locked || !canShift(item, 1)}
+                            onClick={() => shiftWidget(item, 1)}
                           >
                             ↓
                           </button>
@@ -889,6 +959,8 @@ export function PageBuilder({
           </div>
           {section && (
             <aside
+              ref={inspectorRef}
+              tabIndex={-1}
               className="panel builder-controls widget-inspector"
               aria-label="Widget editor"
             >
@@ -896,6 +968,7 @@ export function PageBuilder({
                 <h2>Widget settings</h2>
                 <button
                   className="quiet"
+                  title="Close settings (Esc)"
                   aria-label="Close widget editor"
                   onClick={() => setSelected("")}
                 >
@@ -905,8 +978,23 @@ export function PageBuilder({
               {section ? (
                 <>
                   <p className="widget-location">
-                    {regionOf(section)} / {section.type}
+                    {regionOf(section)} /{" "}
+                    {section.type === "Html"
+                      ? "HTML"
+                      : section.type === "ImageText"
+                        ? "Image & text"
+                        : section.type === "FeaturedProducts"
+                          ? "Product collection"
+                          : section.type}
                   </p>
+                  {section.parentId && (
+                    <button
+                      className="secondary"
+                      onClick={() => select(section.parentId!)}
+                    >
+                      Edit parent container
+                    </button>
+                  )}
                   {section.type === "Container" && (
                     <>
                       <label>
@@ -1099,10 +1187,7 @@ export function PageBuilder({
                           value={section.htmlHeight ?? 240}
                           onChange={(event) =>
                             update({
-                              htmlHeight: Math.max(
-                                60,
-                                Math.min(1200, Number(event.target.value)),
-                              ),
+                              htmlHeight: Number(event.target.value),
                             })
                           }
                         />

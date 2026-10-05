@@ -178,6 +178,7 @@ export function ThemeLibraryView({
             </button>
             <button
               className="quiet"
+              hidden={active}
               disabled={locked || active}
               onClick={() => onActivate(card.id)}
             >

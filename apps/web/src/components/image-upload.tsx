@@ -112,7 +112,8 @@ export function ImageUpload({
         />
       </label>
       <p className="helper">
-        JPEG, PNG, or WebP · Up to 5 MB · Public storefront imagery
+        JPEG, PNG, or WebP · Up to {localOnly ? "1 MB" : "5 MB"} ·{" "}
+        {localOnly ? "Saved in this browser" : "Public storefront imagery"}
       </p>
       {error && (
         <p className="alert" role="alert">

@@ -105,7 +105,7 @@ test("widget library places cards in canvas regions and opens the matching edito
     await page.mouse.up();
   } else await mainSlot.dispatchEvent("drop", { dataTransfer: transfer });
   const editor = page.getByRole("complementary", { name: "Widget editor" });
-  await expect(editor).toContainText("Main / ImageText");
+  await expect(editor).toContainText("Main / Image & text");
   await editor.getByLabel("Title", { exact: true }).fill("A new image story");
   await expect(
     page.getByRole("heading", { name: "A new image story" }),
