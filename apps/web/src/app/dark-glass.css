@@ -2045,3 +2045,17 @@ td {
 .store-product-dialog { padding-top: 54px; box-sizing: border-box; }
 .store-product-dialog .product-description { line-height: 1.65; overflow-wrap: anywhere; }
 .store-product-dialog .widget-button { min-height: 44px; }
+
+/* Explicit centering overrides the reset and the former bag drawer placement. */
+.shop-drawer,
+.store-product-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+}
+.shop-drawer {
+  width: min(480px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100dvh - 32px);
+  border-radius: 16px;
+}
